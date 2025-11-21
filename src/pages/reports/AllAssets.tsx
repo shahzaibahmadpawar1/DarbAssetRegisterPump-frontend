@@ -232,6 +232,9 @@ export default function AllAssetsPage() {
         </head>
         <body>
           <h1>All Assets</h1>
+          <h2 style="margin-top: 8px; margin-bottom: 16px; text-align: center; color: #555; font-size: 14px;">
+            Total Inventory Value: ${totalInventoryValue.toLocaleString()}
+          </h2>
           <table>
             <thead>
               <tr>
@@ -363,7 +366,13 @@ export default function AllAssetsPage() {
             </span>
           </p>
         </div>
-        <Button onClick={handlePrint} variant="outline">🖨️ Print</Button>
+        <Button 
+          onClick={handlePrint} 
+          variant="outline"
+          className="bg-white/60 backdrop-blur-md hover:bg-white/80"
+        >
+          🖨️ Print
+        </Button>
       </div>
 
       <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md">

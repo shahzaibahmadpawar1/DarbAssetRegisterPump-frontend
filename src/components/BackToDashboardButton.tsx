@@ -14,7 +14,7 @@ export default function BackToDashboardButton() {
     <Button
       onClick={handleClick}
       variant="outline"
-      className="flex items-center gap-2"
+      className="flex items-center gap-2 bg-white/60 backdrop-blur-md hover:bg-white/80"
     >
       <Home className="w-4 h-4" />
       Back to Dashboard

@@ -17,31 +17,37 @@ export default function HomeDashboard(props: HomeDashboardProps) {
       label: "Add Station",
       icon: <Factory className="w-5 h-5" />,
       onClick: props.onGoPumps,
+      buttonText: "Add", 
     },
     {
       label: "Add Asset",
       icon: <PlusCircle className="w-5 h-5" />,
       onClick: props.onGoAssets,
+      buttonText: "Add", 
     },
     {
       label: "Add Category",
       icon: <FolderPlus className="w-5 h-5" />,
       onClick: props.onGoAddCategory,
+      buttonText: "Add", 
     },
     {
       label: "Filter by Station & Category",
       icon: <Grid2X2 className="w-5 h-5" />,
       onClick: props.onGoReportAssetsByCategory,
+      buttonText: "Open", 
     },
     {
       label: "All Assets",
       icon: <PackageSearch className="w-5 h-5" />,
       onClick: props.onGoReportAllAssets,
+      buttonText: "Open", 
     },
     {
       label: "All Stations",
       icon: <List className="w-5 h-5" />,
       onClick: props.onGoReportAllStations,
+      buttonText: "Open", 
     },
   ];
 
@@ -59,7 +65,8 @@ export default function HomeDashboard(props: HomeDashboardProps) {
             </CardHeader>
             <CardContent>
               <Button onClick={it.onClick} className="w-full">
-                Open
+                {/* Use the dynamic buttonText property */}
+                {it.buttonText}
               </Button>
             </CardContent>
           </Card>

@@ -78,6 +78,7 @@ export default function AssetForm({
   const [assignmentRows, setAssignmentRows] = useState<AssetAssignmentInput[]>([]);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const barcodeRef = useRef<HTMLInputElement | null>(null);
+  const barcodeRegistration = register("barcode");
   const quantityValue = watch("quantity");
   const totalAssigned = assignmentRows.reduce(
     (sum, row) => sum + (row.quantity ? Number(row.quantity) : 0),
@@ -140,7 +141,7 @@ export default function AssetForm({
     } else {
       setAssignmentRows([]);
     }
-  }, [open, initialData, initialAssignments, defaultPumpId, reset]);
+  }, [open, reset]);
 
   useEffect(() => {
     if (remainingQuantity < 0) {
@@ -233,9 +234,9 @@ export default function AssetForm({
             <Label>Barcode</Label>
             <div className="flex gap-2">
               <Input
-                {...register("barcode")}
+                {...barcodeRegistration}
                 ref={(el) => {
-                  register("barcode").ref(el);
+                  barcodeRegistration.ref(el);
                   barcodeRef.current = el;
                 }}
                 placeholder="Scan barcode here"
@@ -272,6 +273,7 @@ export default function AssetForm({
           <div className="col-span-2 sm:col-span-1">
             <Label>Category (optional)</Label>
             <Select
+              value={watch("category_id") || "none"}
               onValueChange={(val) =>
                 setValue("category_id", val === "none" ? null : val)
               }

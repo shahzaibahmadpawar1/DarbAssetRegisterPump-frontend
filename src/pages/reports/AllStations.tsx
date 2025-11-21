@@ -146,7 +146,11 @@ export default function AllStationsPage() {
       <div className="flex justify-between items-center mb-6">
         <BackToDashboardButton />
         <h1 className="text-3xl font-bold">All Stations</h1>
-        <Button onClick={handlePrint} variant="outline">
+        <Button 
+          onClick={handlePrint} 
+          variant="outline"
+          className="bg-white/60 backdrop-blur-md hover:bg-white/80"
+        >
           🖨️ Print
         </Button>
       </div>

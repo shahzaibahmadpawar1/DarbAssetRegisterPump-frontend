@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import {
   Table,
@@ -38,6 +38,9 @@ type Asset = {
   pump_id?: number | null;
   assignmentQuantity?: number;
   assignmentValue?: number;
+  quantity?: number | null;
+  asset_value?: number | null;
+  totalValue?: number | null;
 };
 
 export default function AssetsByCategoryReport() {
@@ -93,14 +96,8 @@ export default function AssetsByCategoryReport() {
 
         const res = await fetch(url, { credentials: "include" });
         const data = await res.json();
-        const normalized = Array.isArray(data) ? data : [];
-        const filtered =
-          pumpId === "all"
-            ? normalized
-            : normalized.filter(
-                (row: any) => row.pump_id?.toString() === pumpId
-              );
-        setAssets(filtered);
+        // Trust the API response - backend already handles all filtering
+        setAssets(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Failed to load assets:", err);
       }
@@ -117,6 +114,18 @@ export default function AssetsByCategoryReport() {
     categoryId === "all"
       ? "All Categories"
       : categories.find((c) => c.id === categoryId)?.name ?? "Category";
+
+  // Calculate total value: sum of (assigned quantity × unit value) for each row
+  const totalInventoryValue = useMemo(() => {
+    return assets.reduce(
+      (sum, asset) => {
+        const assignedQty = asset.assignmentQuantity ?? 0;
+        const unitValue = asset.asset_value ?? 0;
+        return sum + (assignedQty * unitValue);
+      },
+      0
+    );
+  }, [assets]);
 
   const handlePrint = () => {
     if (assets.length === 0) {
@@ -143,6 +152,7 @@ export default function AssetsByCategoryReport() {
         <body>
           <h1>Assets by Category</h1>
           <h2>Category: ${selectedCategoryName} | Station: ${selectedPumpName}</h2>
+          <h2 style="margin-top: 8px; margin-bottom: 16px;">Total Inventory Value: ${totalInventoryValue.toLocaleString()}</h2>
           <table>
             <thead>
               <tr>
@@ -152,7 +162,8 @@ export default function AssetsByCategoryReport() {
                 <th>Category</th>
                 <th>Station</th>
                 <th>Assigned Qty</th>
-                <th>Assigned Value</th>
+                <th>Unit Value</th>
+                <th>Total Value</th>
               </tr>
             </thead>
             <tbody>
@@ -166,7 +177,8 @@ export default function AssetsByCategoryReport() {
                     <td>${a.categoryName ?? "-"}</td>
                     <td>${a.pumpName ?? "-"}</td>
                     <td>${a.assignmentQuantity ?? 0}</td>
-                    <td>${a.assignmentValue ?? 0}</td>
+                    <td>${a.asset_value ?? 0}</td>
+                    <td>${(a.assignmentQuantity ?? 0) * (a.asset_value ?? 0)}</td>
                   </tr>`
                 )
                 .join("")}
@@ -183,7 +195,18 @@ export default function AssetsByCategoryReport() {
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-4">
-      <BackToDashboardButton />
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+        <BackToDashboardButton />
+        <div>
+          <h1 className="text-3xl font-bold">Assets by Category</h1>
+          <p className="text-sm text-muted-foreground">
+            Total inventory value:{" "}
+            <span className="font-semibold">
+              {totalInventoryValue.toLocaleString()}
+            </span>
+          </p>
+        </div>
+      </div>
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-6 justify-between">
         <div className="flex flex-wrap items-center gap-6">
@@ -223,7 +246,11 @@ export default function AssetsByCategoryReport() {
           </Select>
         </div>
         </div>
-        <Button variant="outline" onClick={handlePrint}>
+        <Button 
+          variant="outline" 
+          onClick={handlePrint}
+          className="bg-white/60 backdrop-blur-md hover:bg-white/80"
+        >
           🖨️ Print
         </Button>
       </div>
@@ -239,7 +266,8 @@ export default function AssetsByCategoryReport() {
               <TableHead>Category</TableHead>
               <TableHead>Station</TableHead>
               <TableHead>Assigned Qty</TableHead>
-              <TableHead>Assigned Value</TableHead>
+              <TableHead>Unit Value</TableHead>
+              <TableHead>Total Value</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -247,7 +275,7 @@ export default function AssetsByCategoryReport() {
             {assets.length > 0 ? (
               assets.map((a) => (
                 <TableRow
-                  key={a.id}
+                  key={`${a.id}-${a.pump_id || 'unassigned'}`}
                   className="hover:bg-white/80 transition"
                 >
                   <TableCell>{a.asset_name}</TableCell>
@@ -256,12 +284,13 @@ export default function AssetsByCategoryReport() {
                   <TableCell>{a.categoryName ?? "-"}</TableCell>
                   <TableCell>{a.pumpName ?? "-"}</TableCell>
                   <TableCell>{a.assignmentQuantity ?? 0}</TableCell>
-                  <TableCell>{a.assignmentValue ?? 0}</TableCell>
+                  <TableCell>{a.asset_value ?? 0}</TableCell>
+                  <TableCell>{((a.assignmentQuantity ?? 0) * (a.asset_value ?? 0))}</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-gray-500">
+                <TableCell colSpan={8} className="text-center text-gray-500">
                   {categoryId !== "all" || pumpId !== "all"
                     ? "No assets found for the selected filters."
                     : "No assets found."}
