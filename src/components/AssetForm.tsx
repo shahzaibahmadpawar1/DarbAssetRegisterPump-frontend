@@ -36,6 +36,8 @@ export type AssetFormData = {
   remarks?: string;
   category_id?: string | null;
   asset_value?: number;
+  purchase_price?: number;
+  purchase_date?: string;
   assignments?: AssetAssignmentInput[];
 };
 
@@ -265,10 +267,27 @@ export default function AssetForm({
             <Input {...register("units")} />
           </div>
 
-          {/* ✅ Asset Value */}
+          {/* ✅ Asset Value (Display/Reference) */}
           <div className="col-span-1 sm:col-span-1">
-            <Label>Asset Value</Label>
+            <Label>Asset Value (Reference)</Label>
             <Input type="number" step="0.01" {...register("asset_value")} />
+            <p className="text-xs text-muted-foreground mt-1">
+              Reference value for display
+            </p>
+          </div>
+
+          {/* ✅ Purchase Price (for batch creation) */}
+          <div className="col-span-1 sm:col-span-1">
+            <Label>Purchase Price *</Label>
+            <Input
+              type="number"
+              step="0.01"
+              {...register("purchase_price", { required: true })}
+              placeholder="Price per unit"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Actual purchase price for this batch
+            </p>
           </div>
 
           {/* ✅ Category Dropdown */}

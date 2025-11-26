@@ -6,8 +6,9 @@ import AssetForm, { type AssetFormData } from "@/components/AssetForm";
 import BarcodeScannerModal from "../components/BarcodeScannerModal";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import PrintAssets from "@/components/PrintAssets";
-import { ArrowLeft, Plus, Printer, FileDown, RotateCcw } from "lucide-react";
+import { ArrowLeft, Plus, Printer, FileDown, RotateCcw, PackagePlus } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import AddBatchModal from "@/components/AddBatchModal";
 
 interface AssetsProps {
   pump_id: number | null;
@@ -23,6 +24,8 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [deletingAssetId, setDeletingAssetId] = useState<number | null>(null);
+  const [showAddBatch, setShowAddBatch] = useState(false);
+  const [selectedAssetForBatch, setSelectedAssetForBatch] = useState<Asset | null>(null);
 
   const fetchAssets = async () => {
     try {
@@ -78,6 +81,8 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
     remarks: toNull(data.remarks),
     category_id: toNull(data.category_id),
     asset_value: toNum(data.asset_value),
+    purchase_price: toNum(data.purchase_price),
+    purchase_date: data.purchase_date || new Date().toISOString(),
     assignments: normalizeAssignments(data.assignments),
   });
 
@@ -242,6 +247,13 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
               }
             }}
             onDelete={(id) => setDeletingAssetId(id)}
+            onAddInventory={(id) => {
+              const a = assets.find((x) => x.id === id);
+              if (a) {
+                setSelectedAssetForBatch(a);
+                setShowAddBatch(true);
+              }
+            }}
           />
         )}
       </div>
@@ -272,6 +284,19 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
         onConfirm={handleDeleteAsset}
         title="Delete Asset"
         description="Are you sure you want to delete this asset?"
+      />
+
+      <AddBatchModal
+        open={showAddBatch}
+        onClose={() => {
+          setShowAddBatch(false);
+          setSelectedAssetForBatch(null);
+        }}
+        assetId={selectedAssetForBatch?.id || 0}
+        assetName={selectedAssetForBatch?.asset_name || ""}
+        onSuccess={() => {
+          fetchAssets();
+        }}
       />
     </div>
   );

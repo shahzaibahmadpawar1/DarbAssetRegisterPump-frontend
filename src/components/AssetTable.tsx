@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, PackagePlus } from "lucide-react";
 
 export interface AssetAssignment {
   id: number;
@@ -40,6 +40,7 @@ interface AssetTableProps {
   assets: Asset[];
   onEdit: (assetId: number) => void;
   onDelete: (assetId: number) => void;
+  onAddInventory?: (assetId: number) => void;
   mode?: "global" | "station";
 }
 
@@ -47,6 +48,7 @@ export default function AssetTable({
   assets,
   onEdit,
   onDelete,
+  onAddInventory,
   mode = "global",
 }: AssetTableProps) {
   if (assets.length === 0) {
@@ -141,6 +143,17 @@ export default function AssetTable({
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
+                    {onAddInventory && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onAddInventory(asset.id)}
+                        data-testid={`button-add-inventory-${asset.id}`}
+                        title="Add Inventory"
+                      >
+                        <PackagePlus className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
