@@ -82,7 +82,7 @@ export default function PumpForm({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -91,7 +91,7 @@ export default function PumpForm({
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-sm font-medium">
                 Station Name <span className="text-destructive">*</span>
@@ -147,7 +147,7 @@ export default function PumpForm({
               />
             </div>
 
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="details" className="text-sm font-medium">
                 Additional Details
               </Label>
@@ -161,11 +161,11 @@ export default function PumpForm({
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <DialogFooter className="gap-2 flex-col-reverse sm:flex-row">
+            <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="w-full sm:w-auto">
               {loading ? "Saving..." : "Save Station"}
             </Button>
           </DialogFooter>

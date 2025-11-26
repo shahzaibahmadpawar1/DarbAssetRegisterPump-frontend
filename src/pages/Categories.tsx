@@ -77,22 +77,23 @@ export default function Categories() {
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className="max-w-5xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       <BackToDashboardButton />
-      <h1 className="text-3xl font-bold">Categories</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold">Categories</h1>
 
       {/* Add Category */}
       <Card>
         <CardHeader>
           <CardTitle>Add Category</CardTitle>
         </CardHeader>
-        <CardContent className="flex gap-2">
+        <CardContent className="flex flex-col sm:flex-row gap-2">
           <Input
             placeholder="Category name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            className="flex-1"
           />
-          <Button onClick={addCategory} disabled={loading}>
+          <Button onClick={addCategory} disabled={loading} className="w-full sm:w-auto shrink-0">
             {loading ? "Adding..." : "Add"}
           </Button>
         </CardContent>
@@ -115,13 +116,14 @@ export default function Categories() {
               {categories.map((c) => (
                 <li
                   key={c.id}
-                  className="flex justify-between items-center py-2"
+                  className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 py-2"
                 >
-                  <span>{c.name}</span>
+                  <span className="break-words flex-1">{c.name}</span>
                   <Button
                     variant="destructive"
                     size="sm"
                     onClick={() => deleteCategory(c.id)}
+                    className="w-full sm:w-auto shrink-0"
                   >
                     Delete
                   </Button>

@@ -59,8 +59,8 @@ export default function AssetTable({
 
   return (
     <div className="border rounded-md overflow-hidden">
-      <div className="overflow-x-auto">
-        <Table>
+      <div className="overflow-x-auto -mx-3 sm:mx-0">
+        <Table className="min-w-[1200px] sm:min-w-0">
           <TableHeader>
             <TableRow>
               <TableHead className="font-semibold">Serial No.</TableHead>

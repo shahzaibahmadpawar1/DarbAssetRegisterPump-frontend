@@ -354,12 +354,12 @@ export default function AllAssetsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+    <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
         <BackToDashboardButton />
-        <div>
-          <h1 className="text-3xl font-bold">All Assets</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="w-full sm:w-auto">
+          <h1 className="text-2xl sm:text-3xl font-bold">All Assets</h1>
+          <p className="text-sm text-black">
             Total inventory value:{" "}
             <span className="font-semibold">
               {totalInventoryValue.toLocaleString()}
@@ -369,14 +369,14 @@ export default function AllAssetsPage() {
         <Button 
           onClick={handlePrint} 
           variant="outline"
-          className="bg-white/60 backdrop-blur-md hover:bg-white/80"
+          className="bg-white/60 backdrop-blur-md hover:bg-white/80 w-full sm:w-auto shrink-0"
         >
           🖨️ Print
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md">
-        <Table className="w-full">
+      <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md -mx-3 sm:mx-0">
+        <Table className="w-full min-w-[900px] sm:min-w-0">
           <TableHeader>
             <TableRow>
               <TableHead>ID</TableHead>
@@ -418,9 +418,9 @@ export default function AllAssetsPage() {
                   )}
                 </TableCell>
                 <TableCell>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openDetails(a)}>Details</Button>
-                    <Button variant="outline" size="sm" onClick={() => openAssign(a)}>Assign</Button>
+                  <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                    <Button variant="outline" size="sm" onClick={() => openDetails(a)} className="text-xs">Details</Button>
+                    <Button variant="outline" size="sm" onClick={() => openAssign(a)} className="text-xs">Assign</Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -431,7 +431,7 @@ export default function AllAssetsPage() {
 
       {/* DETAILS dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editMode ? "Edit Asset" : "Asset Details"}</DialogTitle>
             <DialogDescription>
@@ -440,7 +440,7 @@ export default function AllAssetsPage() {
           </DialogHeader>
 
           {selected && (
-            <form className="grid grid-cols-2 gap-4" onSubmit={(e) => e.preventDefault()}>
+            <form className="grid grid-cols-1 sm:grid-cols-2 gap-4" onSubmit={(e) => e.preventDefault()}>
               {(
                 [
                   ["asset_name", "Asset Name"],
@@ -453,7 +453,7 @@ export default function AllAssetsPage() {
                   ["remarks", "Remarks"],
                 ] as const
               ).map(([key, label]) => (
-                <div className="col-span-2 sm:col-span-1" key={key}>
+                <div className="col-span-1 sm:col-span-1" key={key}>
                   <Label>{label}</Label>
                   <Input
                     type={key === "asset_value" ? "number" : "text"}
@@ -473,16 +473,16 @@ export default function AllAssetsPage() {
                 </div>
               ))}
 
-              <div className="col-span-2 flex justify-between mt-4">
+              <div className="col-span-1 sm:col-span-2 flex flex-col-reverse sm:flex-row justify-between gap-2 mt-4">
                 {!editMode ? (
                   <>
-                    <Button type="button" variant="outline" onClick={() => setEditMode(true)}>✏️ Edit</Button>
-                    <Button type="button" variant="destructive" onClick={() => deleteAsset(selected.id)}>🗑️ Delete</Button>
+                    <Button type="button" variant="outline" onClick={() => setEditMode(true)} className="w-full sm:w-auto">✏️ Edit</Button>
+                    <Button type="button" variant="destructive" onClick={() => deleteAsset(selected.id)} className="w-full sm:w-auto">🗑️ Delete</Button>
                   </>
                 ) : (
                   <>
-                    <Button type="button" variant="outline" onClick={() => setEditMode(false)}>Cancel</Button>
-                    <Button type="button" onClick={saveEdit}>💾 Save</Button>
+                    <Button type="button" variant="outline" onClick={() => setEditMode(false)} className="w-full sm:w-auto">Cancel</Button>
+                    <Button type="button" onClick={saveEdit} className="w-full sm:w-auto">💾 Save</Button>
                   </>
                 )}
               </div>
@@ -493,7 +493,7 @@ export default function AllAssetsPage() {
 
       {/* ASSIGN dialog */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Assign Asset</DialogTitle>
             <DialogDescription>
@@ -503,14 +503,14 @@ export default function AllAssetsPage() {
 
           <div className="grid grid-cols-1 gap-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div className="flex-1">
                   <Label>Station Allocations</Label>
                   <p className="text-xs text-muted-foreground">
                     Assign quantities to one or more petrol pumps.
                   </p>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={addAssignmentRow}>
+                <Button type="button" variant="outline" size="sm" onClick={addAssignmentRow} className="shrink-0">
                   Add Station
                 </Button>
               </div>
@@ -522,8 +522,8 @@ export default function AllAssetsPage() {
               )}
 
               {assignmentRows.map((row, index) => (
-                <div key={index} className="grid grid-cols-5 gap-2 items-end">
-                  <div className="col-span-3">
+                <div key={index} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
+                  <div className="col-span-1 sm:col-span-3">
                     <Label className="text-xs uppercase tracking-wide">Pump</Label>
                     <Select
                       value={row.pump_id?.toString() ?? "none"}
@@ -546,7 +546,7 @@ export default function AllAssetsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <Label className="text-xs uppercase tracking-wide">Quantity</Label>
                     <Input
                       type="number"
@@ -560,7 +560,7 @@ export default function AllAssetsPage() {
                       }
                     />
                   </div>
-                  <div className="col-span-5 flex justify-end">
+                  <div className="col-span-1 sm:col-span-5 flex justify-start sm:justify-end">
                     <Button
                       type="button"
                       variant="ghost"
@@ -608,11 +608,11 @@ export default function AllAssetsPage() {
               </Select>
             </div>
 
-            <div className="flex justify-end gap-2 mt-2">
-              <Button variant="outline" onClick={() => setAssignOpen(false)}>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-2">
+              <Button variant="outline" onClick={() => setAssignOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button onClick={saveAssign} disabled={!!assignmentError}>
+              <Button onClick={saveAssign} disabled={!!assignmentError} className="w-full sm:w-auto">
                 Save
               </Button>
             </div>

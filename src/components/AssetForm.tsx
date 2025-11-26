@@ -202,7 +202,7 @@ export default function AssetForm({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -210,27 +210,27 @@ export default function AssetForm({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(submit)} className="grid grid-cols-2 gap-4 mt-2">
+        <form onSubmit={handleSubmit(submit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
           {/* ✅ Asset Name */}
-          <div className="col-span-2">
+          <div className="col-span-1 sm:col-span-2">
             <Label>Asset Name</Label>
             <Input {...register("asset_name", { required: true })} />
           </div>
 
           {/* ✅ Asset Number */}
-          <div className="col-span-2 sm:col-span-1">
+          <div className="col-span-1 sm:col-span-1">
             <Label>Asset Number</Label>
             <Input {...register("asset_number", { required: true })} />
           </div>
 
           {/* ✅ Serial Number */}
-          <div className="col-span-2 sm:col-span-1">
+          <div className="col-span-1 sm:col-span-1">
             <Label>Serial Number</Label>
             <Input {...register("serial_number", { required: true })} />
           </div>
 
           {/* ✅ Barcode (hardware scanner ready) */}
-          <div className="col-span-2 sm:col-span-1">
+          <div className="col-span-1 sm:col-span-2">
             <Label>Barcode</Label>
             <div className="flex gap-2">
               <Input
@@ -240,11 +240,13 @@ export default function AssetForm({
                   barcodeRef.current = el;
                 }}
                 placeholder="Scan barcode here"
+                className="flex-1"
               />
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => barcodeRef.current?.focus()}
+                className="shrink-0"
               >
                 Scan
               </Button>
@@ -252,25 +254,25 @@ export default function AssetForm({
           </div>
 
           {/* ✅ Quantity */}
-          <div className="col-span-2 sm:col-span-1">
+          <div className="col-span-1 sm:col-span-1">
             <Label>Quantity</Label>
             <Input type="number" {...register("quantity")} />
           </div>
 
           {/* ✅ Units */}
-          <div className="col-span-2 sm:col-span-1">
+          <div className="col-span-1 sm:col-span-1">
             <Label>Units</Label>
             <Input {...register("units")} />
           </div>
 
           {/* ✅ Asset Value */}
-          <div className="col-span-2 sm:col-span-1">
+          <div className="col-span-1 sm:col-span-1">
             <Label>Asset Value</Label>
             <Input type="number" step="0.01" {...register("asset_value")} />
           </div>
 
           {/* ✅ Category Dropdown */}
-          <div className="col-span-2 sm:col-span-1">
+          <div className="col-span-1 sm:col-span-1">
             <Label>Category (optional)</Label>
             <Select
               value={watch("category_id") || "none"}
@@ -293,22 +295,22 @@ export default function AssetForm({
           </div>
 
           {/* ✅ Remarks */}
-          <div className="col-span-2">
+          <div className="col-span-1 sm:col-span-2">
             <Label>Remarks</Label>
             <Input {...register("remarks")} />
           </div>
 
           {/* ✅ Station Assignments */}
-          <div className="col-span-2 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="col-span-1 sm:col-span-2 space-y-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div>
                 <Label>Station Allocations</Label>
                 <p className="text-xs text-muted-foreground">
-                  Distribute the asset quantity across petrol pumps.
+                  Distribute the asset quantity across Stations.
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={addAssignmentRow}>
-                Add Station
+              <Button type="button" variant="outline" size="sm" onClick={addAssignmentRow} className="shrink-0">
+                Assign Station
               </Button>
             </div>
 
@@ -319,8 +321,8 @@ export default function AssetForm({
             )}
 
             {assignmentRows.map((row, index) => (
-              <div key={index} className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
-                <div className="col-span-2 md:col-span-3">
+              <div key={index} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
+                <div className="col-span-1 sm:col-span-3">
                   <Label className="text-xs uppercase tracking-wide">Pump</Label>
                   <Select
                     value={row.pump_id?.toString() ?? "none"}
@@ -356,7 +358,7 @@ export default function AssetForm({
                     }
                   />
                 </div>
-                <div className="col-span-1 flex justify-end">
+                <div className="col-span-1 sm:col-span-1 flex justify-start sm:justify-end">
                   <Button
                     type="button"
                     variant="ghost"
@@ -384,11 +386,11 @@ export default function AssetForm({
           </div>
 
           {/* ✅ Buttons */}
-          <div className="col-span-2 flex justify-end gap-3 mt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="col-span-1 sm:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-3 mt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button type="submit">Save Asset</Button>
+            <Button type="submit" className="w-full sm:w-auto">Save Asset</Button>
           </div>
         </form>
       </DialogContent>

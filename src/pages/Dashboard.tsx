@@ -61,7 +61,7 @@ export default function Dashboard({
       setShowPumpForm(false);
     } catch (err) {
       console.error(err);
-      alert("Error adding pump");
+      alert("Error adding Station");
     }
   };
 
@@ -73,7 +73,7 @@ export default function Dashboard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to update pump");
+      if (!res.ok) throw new Error("Failed to update Station");
       setPumps((prev) =>
         prev.map((p) =>
           p.id === editingPump.id ? { ...p, ...data } : p
@@ -83,7 +83,7 @@ export default function Dashboard({
       setShowPumpForm(false);
     } catch (err) {
       console.error(err);
-      alert("Error updating pump");
+      alert("Error updating Station");
     }
   };
 
@@ -93,12 +93,12 @@ export default function Dashboard({
       const res = await fetch(`${API_BASE}/api/pumps/${deletingPumpId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Failed to delete pump");
+      if (!res.ok) throw new Error("Failed to delete Statoion");
       setPumps((prev) => prev.filter((p) => p.id !== deletingPumpId));
       setDeletingPumpId(null);
     } catch (err) {
       console.error(err);
-      alert("Error deleting pump");
+      alert("Error deleting Station");
     }
   };
 
@@ -108,9 +108,9 @@ export default function Dashboard({
       <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6 no-print">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Petrol Pump Stations</h1>
+            <h1 className="text-3xl font-bold">Stations</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your petrol pump stations and their assets
+              Manage stations and their assets
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -177,14 +177,14 @@ export default function Dashboard({
               }
             : undefined
         }
-        title={editingPump ? "Edit Petrol Pump" : "Add Petrol Pump"}
+        title={editingPump ? "Edit Station" : "Add Station"}
       />
       <DeleteConfirmDialog
         open={deletingPumpId !== null}
         onClose={() => setDeletingPumpId(null)}
         onConfirm={handleDeletePump}
-        title="Delete Pump Station"
-        description="Are you sure you want to delete this pump station?"
+        title="Delete Station"
+        description="Are you sure you want to delete this station?"
       />
     </div>
   );

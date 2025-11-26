@@ -192,32 +192,32 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
   return (
     <div className="min-h-screen bg-white/80 dark:bg-black/40">
       <PrintAssets assets={assetsForView} />
-      <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6 no-print">
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 no-print">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={onBack} className="gap-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button variant="outline" onClick={onBack} className="gap-2 shrink-0">
               <ArrowLeft className="w-4 h-4" /> Back
             </Button>
-            <h1 className="text-3xl font-bold">Assets</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">Assets</h1>
           </div>
-          <div className="flex flex-col gap-2 sm:items-end">
-            <div className="text-sm text-muted-foreground">
+          <div className="flex flex-col gap-2 sm:items-end w-full sm:w-auto">
+            <div className="text-sm text-black">
               Total value{" "}
               <span className="font-semibold">
                 {totalValueForView.toLocaleString()}
               </span>
             </div>
-            <div className="flex gap-2 flex-wrap justify-end">
-            <Button variant="outline" onClick={() => window.print()} className="gap-2">
-              <Printer className="w-4 h-4" /> Print
+            <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => window.print()} className="gap-2 text-xs sm:text-sm">
+              <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print</span>
             </Button>
-            <Button variant="outline" className="gap-2">
-              <FileDown className="w-4 h-4" /> Export
+            <Button variant="outline" className="gap-2 text-xs sm:text-sm">
+              <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Export</span>
             </Button>
-            <Button variant="outline" onClick={() => setShowScanner(true)} className="gap-2">
-              <RotateCcw className="w-4 h-4" /> Scan Barcode
+            <Button variant="outline" onClick={() => setShowScanner(true)} className="gap-2 text-xs sm:text-sm">
+              <RotateCcw className="w-4 h-4" /> <span className="hidden sm:inline">Scan</span>
             </Button>
-            <Button onClick={() => setShowForm(true)} className="gap-2">
+            <Button onClick={() => setShowForm(true)} className="gap-2 text-xs sm:text-sm">
               <Plus className="w-4 h-4" /> Add Asset
             </Button>
             </div>

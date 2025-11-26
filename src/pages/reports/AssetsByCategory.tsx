@@ -194,12 +194,12 @@ export default function AssetsByCategoryReport() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-4">
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+    <div className="max-w-6xl mx-auto p-3 sm:p-4 md:p-6 space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
         <BackToDashboardButton />
-        <div>
-          <h1 className="text-3xl font-bold">Assets by Category</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="w-full sm:w-auto">
+          <h1 className="text-2xl sm:text-3xl font-bold">Assets by Category</h1>
+          <p className="text-sm text-black">
             Total inventory value:{" "}
             <span className="font-semibold">
               {totalInventoryValue.toLocaleString()}
@@ -208,13 +208,13 @@ export default function AssetsByCategoryReport() {
         </div>
       </div>
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-6 justify-between">
-        <div className="flex flex-wrap items-center gap-6">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 justify-between">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 flex-1">
         {/* Category Filter */}
-        <div className="flex items-center gap-3">
-          <span className="font-semibold">Category:</span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
+          <span className="font-semibold text-sm sm:text-base shrink-0">Category:</span>
           <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger className="w-64">
+            <SelectTrigger className="w-full sm:w-64">
               <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent>
@@ -229,10 +229,10 @@ export default function AssetsByCategoryReport() {
         </div>
 
         {/* Pump Filter */}
-        <div className="flex items-center gap-3">
-          <span className="font-semibold">Station:</span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
+          <span className="font-semibold text-sm sm:text-base shrink-0">Station:</span>
           <Select value={pumpId} onValueChange={setPumpId}>
-            <SelectTrigger className="w-64">
+            <SelectTrigger className="w-full sm:w-64">
               <SelectValue placeholder="Select pump" />
             </SelectTrigger>
             <SelectContent>
@@ -249,15 +249,15 @@ export default function AssetsByCategoryReport() {
         <Button 
           variant="outline" 
           onClick={handlePrint}
-          className="bg-white/60 backdrop-blur-md hover:bg-white/80"
+          className="bg-white/60 backdrop-blur-md hover:bg-white/80 w-full sm:w-auto shrink-0"
         >
           🖨️ Print
         </Button>
       </div>
 
       {/* Assets Table */}
-      <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md">
-        <Table className="w-full">
+      <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md -mx-3 sm:mx-0">
+        <Table className="w-full min-w-[800px] sm:min-w-0">
           <TableHeader>
             <TableRow>
               <TableHead>Asset Name</TableHead>
