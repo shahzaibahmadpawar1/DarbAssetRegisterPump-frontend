@@ -9,6 +9,7 @@ import PrintAssets from "@/components/PrintAssets";
 import { ArrowLeft, Plus, Printer, FileDown, RotateCcw, PackagePlus } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import AddBatchModal from "@/components/AddBatchModal";
+import ViewBatchesModal from "@/components/ViewBatchesModal";
 
 interface AssetsProps {
   pump_id: number | null;
@@ -26,6 +27,8 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
   const [deletingAssetId, setDeletingAssetId] = useState<number | null>(null);
   const [showAddBatch, setShowAddBatch] = useState(false);
   const [selectedAssetForBatch, setSelectedAssetForBatch] = useState<Asset | null>(null);
+  const [showViewBatches, setShowViewBatches] = useState(false);
+  const [selectedAssetForViewBatches, setSelectedAssetForViewBatches] = useState<Asset | null>(null);
 
   const fetchAssets = async () => {
     try {
@@ -254,6 +257,13 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
                 setShowAddBatch(true);
               }
             }}
+            onViewBatches={(id) => {
+              const a = assets.find((x) => x.id === id);
+              if (a) {
+                setSelectedAssetForViewBatches(a);
+                setShowViewBatches(true);
+              }
+            }}
           />
         )}
       </div>
@@ -297,6 +307,16 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
         onSuccess={() => {
           fetchAssets();
         }}
+      />
+
+      <ViewBatchesModal
+        open={showViewBatches}
+        onClose={() => {
+          setShowViewBatches(false);
+          setSelectedAssetForViewBatches(null);
+        }}
+        assetId={selectedAssetForViewBatches?.id || 0}
+        assetName={selectedAssetForViewBatches?.asset_name || ""}
       />
     </div>
   );

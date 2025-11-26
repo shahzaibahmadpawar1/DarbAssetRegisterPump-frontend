@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Pencil, Trash2, PackagePlus } from "lucide-react";
+import { Pencil, Trash2, PackagePlus, Eye } from "lucide-react";
 
 export interface AssetAssignment {
   id: number;
@@ -41,6 +41,7 @@ interface AssetTableProps {
   onEdit: (assetId: number) => void;
   onDelete: (assetId: number) => void;
   onAddInventory?: (assetId: number) => void;
+  onViewBatches?: (assetId: number) => void;
   mode?: "global" | "station";
 }
 
@@ -49,6 +50,7 @@ export default function AssetTable({
   onEdit,
   onDelete,
   onAddInventory,
+  onViewBatches,
   mode = "global",
 }: AssetTableProps) {
   if (assets.length === 0) {
@@ -143,6 +145,17 @@ export default function AssetTable({
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
+                    {onViewBatches && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onViewBatches(asset.id)}
+                        data-testid={`button-view-batches-${asset.id}`}
+                        title="View Purchase Batches"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    )}
                     {onAddInventory && (
                       <Button
                         variant="ghost"
