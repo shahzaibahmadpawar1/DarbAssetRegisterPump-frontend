@@ -36,9 +36,15 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
         body: JSON.stringify({ username, password }),
       });
 
+      const data = await response.json().catch(() => ({}));
+      
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
         throw new Error(data.message || "Invalid credentials");
+      }
+
+      // Store token in localStorage for persistence
+      if (data.token) {
+        localStorage.setItem("auth_token", data.token);
       }
 
       onLogin(username, password);

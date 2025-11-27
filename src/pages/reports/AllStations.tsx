@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 
 type Pump = {
@@ -25,6 +26,8 @@ type Pump = {
   name: string;
   location: string;
   manager: string;
+  contact_number?: string | null;
+  remarks?: string | null;
   assetCount: number;
 };
 
@@ -59,10 +62,18 @@ export default function AllStationsPage() {
   const saveEdit = async () => {
     if (!selected) return;
     try {
+      const payload = {
+        name: selected.name,
+        location: selected.location,
+        manager: selected.manager,
+        contact_number: selected.contact_number ?? null,
+        remarks: selected.remarks ?? null,
+      };
       const res = await fetch(`${API_BASE}/api/pumps/${selected.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(selected),
+        credentials: "include",
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to update Station");
       const updated = await res.json();
@@ -80,7 +91,10 @@ export default function AllStationsPage() {
     if (!confirm("Are you sure you want to delete this station?")) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/pumps/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/api/pumps/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to delete");
       setStations((prev) => prev.filter((s) => s.id !== id));
       setOpen(false);
@@ -208,11 +222,14 @@ export default function AllStationsPage() {
 
           {selected && (
             <form className="grid grid-cols-2 gap-4">
-              {Object.entries({
-                name: "Name",
-                location: "Location",
-                manager: "Manager",
-              }).map(([key, label]) => (
+              {(
+                [
+                  ["name", "Station Name"],
+                  ["manager", "Manager"],
+                  ["location", "Location"],
+                  ["contact_number", "Contact Number"],
+                ] as const
+              ).map(([key, label]) => (
                 <div key={key} className="col-span-2 sm:col-span-1">
                   <Label>{label}</Label>
                   <Input
@@ -224,6 +241,18 @@ export default function AllStationsPage() {
                   />
                 </div>
               ))}
+
+              <div className="col-span-2">
+                <Label>Remarks</Label>
+                <Textarea
+                  value={selected.remarks ?? ""}
+                  disabled={!editMode}
+                  onChange={(e) =>
+                    setSelected({ ...selected, remarks: e.target.value })
+                  }
+                  rows={3}
+                />
+              </div>
 
               <div className="col-span-2 flex justify-between mt-4">
                 {!editMode ? (

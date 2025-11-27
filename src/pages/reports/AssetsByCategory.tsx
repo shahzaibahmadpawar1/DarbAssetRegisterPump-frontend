@@ -32,7 +32,7 @@ type Asset = {
   id: number;
   asset_name: string;
   asset_number: string;
-  serial_number: string;
+  serial_number?: string | null;
   categoryName?: string;
   pumpName?: string;
   pump_id?: number | null;
@@ -115,16 +115,9 @@ export default function AssetsByCategoryReport() {
       ? "All Categories"
       : categories.find((c) => c.id === categoryId)?.name ?? "Category";
 
-  // Calculate total value: sum of (assigned quantity × unit value) for each row
+  // Calculate total value: sum of assignmentValue for each row
   const totalInventoryValue = useMemo(() => {
-    return assets.reduce(
-      (sum, asset) => {
-        const assignedQty = asset.assignmentQuantity ?? 0;
-        const unitValue = asset.asset_value ?? 0;
-        return sum + (assignedQty * unitValue);
-      },
-      0
-    );
+    return assets.reduce((sum, asset) => sum + (asset.assignmentValue ?? 0), 0);
   }, [assets]);
 
   const handlePrint = () => {
@@ -158,11 +151,9 @@ export default function AssetsByCategoryReport() {
               <tr>
                 <th>Asset Name</th>
                 <th>Asset #</th>
-                <th>Serial #</th>
                 <th>Category</th>
                 <th>Station</th>
                 <th>Assigned Qty</th>
-                <th>Unit Value</th>
                 <th>Total Value</th>
               </tr>
             </thead>
@@ -173,12 +164,10 @@ export default function AssetsByCategoryReport() {
                   <tr>
                     <td>${a.asset_name ?? ""}</td>
                     <td>${a.asset_number ?? ""}</td>
-                    <td>${a.serial_number ?? ""}</td>
                     <td>${a.categoryName ?? "-"}</td>
                     <td>${a.pumpName ?? "-"}</td>
                     <td>${a.assignmentQuantity ?? 0}</td>
-                    <td>${a.asset_value ?? 0}</td>
-                    <td>${(a.assignmentQuantity ?? 0) * (a.asset_value ?? 0)}</td>
+                    <td>${(a.assignmentValue ?? 0).toFixed(2)}</td>
                   </tr>`
                 )
                 .join("")}
@@ -259,38 +248,34 @@ export default function AssetsByCategoryReport() {
       <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md -mx-3 sm:mx-0">
         <Table className="w-full min-w-[800px] sm:min-w-0">
           <TableHeader>
-            <TableRow>
-              <TableHead>Asset Name</TableHead>
-              <TableHead>Asset #</TableHead>
-              <TableHead>Serial #</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Station</TableHead>
-              <TableHead>Assigned Qty</TableHead>
-              <TableHead>Unit Value</TableHead>
-              <TableHead>Total Value</TableHead>
-            </TableRow>
+          <TableRow>
+            <TableHead>Asset Name</TableHead>
+            <TableHead>Asset #</TableHead>
+            <TableHead>Category</TableHead>
+            <TableHead>Station</TableHead>
+            <TableHead>Assigned Qty</TableHead>
+            <TableHead>Total Value</TableHead>
+          </TableRow>
           </TableHeader>
 
           <TableBody>
             {assets.length > 0 ? (
               assets.map((a) => (
                 <TableRow
-                  key={`${a.id}-${a.pump_id || 'unassigned'}`}
+                  key={`${a.id}-${a.pump_id || "unassigned"}`}
                   className="hover:bg-white/80 transition"
                 >
                   <TableCell>{a.asset_name}</TableCell>
                   <TableCell>{a.asset_number}</TableCell>
-                  <TableCell>{a.serial_number}</TableCell>
                   <TableCell>{a.categoryName ?? "-"}</TableCell>
                   <TableCell>{a.pumpName ?? "-"}</TableCell>
                   <TableCell>{a.assignmentQuantity ?? 0}</TableCell>
-                  <TableCell>{a.asset_value ?? 0}</TableCell>
-                  <TableCell>{((a.assignmentQuantity ?? 0) * (a.asset_value ?? 0))}</TableCell>
+                  <TableCell>{(a.assignmentValue ?? 0).toFixed(2)}</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-gray-500">
+                <TableCell colSpan={6} className="text-center text-gray-500">
                   {categoryId !== "all" || pumpId !== "all"
                     ? "No assets found for the selected filters."
                     : "No assets found."}

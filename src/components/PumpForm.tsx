@@ -17,8 +17,8 @@ export interface PumpFormData {
   name: string;
   location: string;
   manager: string;
-  contactNumber?: string;
-  details?: string;
+  contact_number?: string;
+  remarks?: string;
 }
 
 interface PumpFormProps {
@@ -41,8 +41,8 @@ export default function PumpForm({
       name: "",
       location: "",
       manager: "",
-      contactNumber: "",
-      details: "",
+      contact_number: "",
+      remarks: "",
     }
   );
 
@@ -64,8 +64,8 @@ export default function PumpForm({
           name: formData.name,
           location: formData.location,
           manager: formData.manager,
-          contactNumber: formData.contactNumber,
-          details: formData.details,
+          contact_number: formData.contact_number,
+          remarks: formData.remarks,
         }),
       });
 
@@ -135,26 +135,26 @@ export default function PumpForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contactNumber" className="text-sm font-medium">
+              <Label htmlFor="contact_number" className="text-sm font-medium">
                 Contact Number
               </Label>
               <Input
-                id="contactNumber"
-                value={formData.contactNumber}
-                onChange={(e) => handleChange("contactNumber", e.target.value)}
+                id="contact_number"
+                value={formData.contact_number}
+                onChange={(e) => handleChange("contact_number", e.target.value)}
                 placeholder="e.g., +966 50 123 4567"
                 className="h-10"
               />
             </div>
 
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="details" className="text-sm font-medium">
-                Additional Details
+              <Label htmlFor="remarks" className="text-sm font-medium">
+                Remarks
               </Label>
               <Textarea
-                id="details"
-                value={formData.details}
-                onChange={(e) => handleChange("details", e.target.value)}
+                id="remarks"
+                value={formData.remarks}
+                onChange={(e) => handleChange("remarks", e.target.value)}
                 placeholder="Any additional information..."
                 rows={3}
               />

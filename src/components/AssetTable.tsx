@@ -15,11 +15,12 @@ export interface AssetAssignment {
   pump_name?: string | null;
   quantity: number;
   assignment_value?: number | null;
+  batch_allocations?: Array<{ batch_id: number; quantity: number; unit_price?: number }>;
 }
 
 export interface Asset {
   id: number;
-  serial_number: string;
+  serial_number?: string | null;
   asset_name: string;
   asset_number: string;
   barcode: string | null;
@@ -89,7 +90,7 @@ export default function AssetTable({
             {assets.map((asset) => (
               <TableRow key={asset.id} data-testid={`row-asset-${asset.id}`}>
                 <TableCell className="font-mono text-sm" data-testid={`text-serial-${asset.id}`}>
-                  {asset.serial_number}
+                  {asset.serial_number ?? "—"}
                 </TableCell>
                 <TableCell data-testid={`text-asset-name-${asset.id}`}>
                   {asset.asset_name}
@@ -98,7 +99,7 @@ export default function AssetTable({
                   {asset.asset_number}
                 </TableCell>
                 <TableCell className="font-mono text-sm" data-testid={`text-barcode-${asset.id}`}>
-                  {asset.barcode}
+                  {asset.barcode ?? "—"}
                 </TableCell>
                 <TableCell data-testid={`text-quantity-${asset.id}`}>
                   {asset.quantity ?? "—"}

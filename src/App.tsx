@@ -40,10 +40,31 @@ function App() {
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/me`, { credentials: "include" });
+        // Get token from localStorage (primary) or try cookie (fallback)
+        const storedToken = localStorage.getItem("auth_token");
+        
+        let res;
+        if (storedToken) {
+          // Use localStorage token
+          res = await fetch(`${API_BASE}/api/me`, {
+            credentials: "include",
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${storedToken}`,
+            },
+          });
+        } else {
+          // Try cookie
+          res = await fetch(`${API_BASE}/api/me`, { 
+            credentials: "include",
+            method: "GET",
+          });
+        }
+        
         const data = await res.json();
 
-        if (data?.authenticated) {
+        if (data?.authenticated && data?.user) {
+          // User is authenticated - restore their session
           setAuthUser(data.user);
 
           // Determine the correct view based on current hash
@@ -59,19 +80,60 @@ function App() {
             "r-all-stations",
           ];
 
-          const view = validViews.includes(hash as View) ? (hash as View) : "home";
+          // If hash is valid and not login, use it; otherwise default to home
+          const view = (hash && validViews.includes(hash as View) && hash !== "login") 
+            ? (hash as View) 
+            : (hash === "login" ? "home" : "home"); // If on login page, go to home
           setCurrentView(view);
-          window.history.replaceState({ view }, view, `#${view}`);
+          // Don't change URL if we're already on the correct view
+          if (view !== hash && hash !== "login") {
+            window.history.replaceState({ view }, view, `#${view}`);
+          }
+        } else {
+          // User is not authenticated - clear everything
+          setAuthUser(null);
+          localStorage.removeItem("auth_token");
+          const hash = window.location.hash?.replace(/^#/, "") as View | "";
+          // Only redirect to login if not already there
+          if (hash !== "login") {
+            setCurrentView("login");
+            window.history.replaceState({ view: "login" }, "Login", "#login");
+          } else {
+            setCurrentView("login");
+          }
+        }
+      } catch (e) {
+        console.error("Session restore failed", e);
+        // On network error, check if we have a stored token
+        const storedToken = localStorage.getItem("auth_token");
+        if (storedToken) {
+          // If we have a token, assume user is authenticated (will be verified on next API call)
+          const hash = window.location.hash?.replace(/^#/, "") as View | "";
+          const validViews: View[] = [
+            "login",
+            "home",
+            "dashboard",
+            "assets",
+            "categories",
+            "r-assets-by-cat",
+            "r-all-assets",
+            "r-all-stations",
+          ];
+          
+          if (hash && validViews.includes(hash as View) && hash !== "login") {
+            // Keep them on the page - API calls will verify auth
+            setAuthUser({ username: "user" }); // Temporary user object
+            setCurrentView(hash as View);
+          } else {
+            setAuthUser(null);
+            setCurrentView("login");
+            window.history.replaceState({ view: "login" }, "Login", "#login");
+          }
         } else {
           setAuthUser(null);
           setCurrentView("login");
           window.history.replaceState({ view: "login" }, "Login", "#login");
         }
-      } catch (e) {
-        console.error("Session restore failed", e);
-        setAuthUser(null);
-        setCurrentView("login");
-        window.history.replaceState({ view: "login" }, "Login", "#login");
       } finally {
         setAuthLoading(false);
       }
@@ -102,6 +164,8 @@ function App() {
     } catch (e) {
       console.warn("Logout failed", e);
     } finally {
+      // Clear localStorage token
+      localStorage.removeItem("auth_token");
       setAuthUser(null);
       setCurrentView("login");
       setSelectedPumpId(null);
@@ -132,39 +196,13 @@ function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // ✅ Add Asset handler (unchanged)
-  const sanitizeAssignments = (
-    assignments?: AssetFormData["assignments"]
-  ) => {
-    if (!assignments) return [];
-    return assignments
-      .filter(
-        (row) =>
-          row &&
-          row.pump_id != null &&
-          row.quantity != null &&
-          Number(row.quantity) > 0
-      )
-      .map((row) => ({
-        pump_id: row.pump_id!,
-        quantity: Number(row.quantity),
-      }));
-  };
-
   const handleAddAsset = async (data: AssetFormData) => {
     try {
       const payload = {
         asset_name: data.asset_name?.trim() || "",
         asset_number: data.asset_number?.trim() || "",
-        serial_number: data.serial_number ?? null,
-        barcode: data.barcode ?? null,
-        quantity: data.quantity == null ? null : Number(data.quantity),
         units: data.units ?? null,
-        remarks: data.remarks ?? null,
         category_id: data.category_id || null,
-        pump_id: null,
-        asset_value: data.asset_value ?? 0,
-        assignments: sanitizeAssignments(data.assignments),
       };
       const res = await fetch(`${API_BASE}/api/assets`, {
         method: "POST",
@@ -228,9 +266,7 @@ function App() {
               open={assetFormOpen}
               onClose={() => setAssetFormOpen(false)}
               onSubmit={handleAddAsset}
-              onScanBarcode={() => alert("Scan not implemented")}
               title="Add Asset"
-              defaultPumpId={selectedPumpId}
             />
 
             <PumpForm

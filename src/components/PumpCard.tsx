@@ -7,6 +7,8 @@ export interface Pump {
   name: string;
   location: string;
   manager: string;
+  contact_number?: string | null;
+  remarks?: string | null;
   assetCount: number;
 }
 

@@ -67,8 +67,8 @@ export default function PrintAssets({
             {assets.map((asset, index) => (
               <tr key={asset.id} className="border-b border-border">
                 <td className="py-2 px-2">{index + 1}</td>
-                <td className="py-2 px-2 font-mono">{asset.serialNumber}</td>
-                <td className="py-2 px-2 font-mono">{asset.barcode}</td>
+                <td className="py-2 px-2 font-mono">{asset.serial_number ?? "—"}</td>
+                <td className="py-2 px-2 font-mono">{asset.barcode ?? "—"}</td>
                 <td className="py-2 px-2 font-mono">{asset.assetNumber}</td>
                 <td className="py-2 px-2">{asset.assetName}</td>
                 <td className="py-2 px-2">{asset.quantity}</td>

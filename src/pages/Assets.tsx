@@ -59,41 +59,18 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
   const toNull = (v: any) => (v === "" || v === undefined ? null : v);
   const trimOrEmpty = (v: any) => (typeof v === "string" ? v.trim() : v);
 
-  const normalizeAssignments = (assignments?: AssetFormData["assignments"]) =>
-    (assignments ?? [])
-      .filter(
-        (row) =>
-          row &&
-          row.pump_id != null &&
-          row.quantity != null &&
-          Number(row.quantity) > 0
-      )
-      .map((row) => ({
-        pump_id: row.pump_id!,
-        quantity: Number(row.quantity),
-        id: row.id,
-      }));
-
   const buildAssetPayload = (data: AssetFormData) => ({
     asset_name: trimOrEmpty(data.asset_name ?? ""),
     asset_number: trimOrEmpty(data.asset_number ?? ""),
-    serial_number: toNull(data.serial_number),
-    barcode: toNull(data.barcode),
-    quantity: toNum(data.quantity),
     units: toNull(data.units),
-    remarks: toNull(data.remarks),
     category_id: toNull(data.category_id),
-    asset_value: toNum(data.asset_value),
-    purchase_price: toNum(data.purchase_price),
-    purchase_date: data.purchase_date || new Date().toISOString(),
-    assignments: normalizeAssignments(data.assignments),
   });
 
   const handleAddAsset = async (data: AssetFormData) => {
     try {
       const payload = buildAssetPayload(data);
-      if (!payload.asset_name || !payload.asset_number || !payload.serial_number)
-        throw new Error("Asset name, asset number and serial number are required.");
+      if (!payload.asset_name || !payload.asset_number)
+        throw new Error("Asset name and asset number are required.");
       const res = await fetch(`${API_BASE}/api/assets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -275,11 +252,8 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
           setEditingAsset(null);
         }}
         onSubmit={editingAsset ? handleUpdateAsset : handleAddAsset}
-        onScanBarcode={() => setShowScanner(true)}
         title={editingAsset ? "Edit Asset" : "Add Asset"}
         initialData={editingAsset ?? undefined}
-        initialAssignments={editingAsset?.assignments ?? []}
-        defaultPumpId={pump_id}
       />
 
       <BarcodeScannerModal
@@ -317,6 +291,7 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
         }}
         assetId={selectedAssetForViewBatches?.id || 0}
         assetName={selectedAssetForViewBatches?.asset_name || ""}
+        onRefresh={fetchAssets}
       />
     </div>
   );

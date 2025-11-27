@@ -32,10 +32,10 @@ export default function Dashboard({
   const fetchPumps = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/api/pumps`);
+      const res = await fetch(`${API_BASE}/api/pumps`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch pumps");
       const data = await res.json();
-      setPumps(data);
+      setPumps(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error loading pumps:", err);
       setError("Failed to load pumps. Please try again later.");
@@ -53,6 +53,7 @@ export default function Dashboard({
       const res = await fetch(`${API_BASE}/api/pumps`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error("Failed to add pump");
@@ -71,6 +72,7 @@ export default function Dashboard({
       const res = await fetch(`${API_BASE}/api/pumps/${editingPump.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error("Failed to update Station");
@@ -92,6 +94,7 @@ export default function Dashboard({
     try {
       const res = await fetch(`${API_BASE}/api/pumps/${deletingPumpId}`, {
         method: "DELETE",
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to delete Statoion");
       setPumps((prev) => prev.filter((p) => p.id !== deletingPumpId));

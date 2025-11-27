@@ -32,10 +32,14 @@ export const apiFetch = async (
     endpoint.startsWith("/") ? endpoint : `/${endpoint}`
   }`;
 
+  // Get token from localStorage if available
+  const token = localStorage.getItem("auth_token");
+  
   const config: RequestInit = {
     credentials: "include", // ✅ required for cookies (sessions)
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}), // Add token to headers if available
       ...(options.headers || {}),
     },
     ...options,

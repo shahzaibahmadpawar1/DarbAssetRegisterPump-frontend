@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/select";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 import type { Asset } from "@/components/AssetTable";
+import ViewBatchesModal from "@/components/ViewBatchesModal";
+import { Trash2 } from "lucide-react";
 
 type AssetRow = Asset & {
   asset_value?: number | null;
@@ -41,6 +43,7 @@ type AssignmentDraft = {
   id?: number;
   pump_id: number | null;
   quantity: number | null;
+  batch_id: number | null; // Selected batch for this assignment
 };
 
 const sanitizeAssignmentDrafts = (rows: AssignmentDraft[]) =>
@@ -49,11 +52,13 @@ const sanitizeAssignmentDrafts = (rows: AssignmentDraft[]) =>
       (row) =>
         row.pump_id != null &&
         row.quantity != null &&
-        Number(row.quantity) > 0
+        Number(row.quantity) > 0 &&
+        row.batch_id != null // Require batch selection
     )
     .map((row) => ({
       pump_id: row.pump_id!,
       quantity: Number(row.quantity),
+      batch_id: row.batch_id!,
       id: row.id,
     }));
 
@@ -63,8 +68,6 @@ const draftTotalQuantity = (rows: AssignmentDraft[]) =>
 const buildAssetPayload = (asset: AssetRow) => ({
   asset_name: asset.asset_name,
   asset_number: asset.asset_number,
-  serial_number: asset.serial_number,
-  barcode: asset.barcode,
   quantity: asset.quantity,
   units: asset.units,
   remarks: asset.remarks,
@@ -84,6 +87,8 @@ export default function AllAssetsPage() {
   const [selected, setSelected] = useState<AssetRow | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [open, setOpen] = useState(false);
+  const detailNumericFields = useMemo(() => new Set(["quantity", "asset_value"]), []);
+  const detailReadOnlyFields = useMemo(() => new Set(["categoryName"]), []);
 
   // Assign modal state
   const [assignOpen, setAssignOpen] = useState(false);
@@ -92,8 +97,13 @@ export default function AllAssetsPage() {
   const [assignCatId, setAssignCatId] = useState<string>("none");
   const [assignmentRows, setAssignmentRows] = useState<AssignmentDraft[]>([]);
   const [assignmentError, setAssignmentError] = useState<string>("");
+  const [availableBatches, setAvailableBatches] = useState<any[]>([]);
+  
+  // View batches modal state
+  const [showViewBatches, setShowViewBatches] = useState(false);
+  const [selectedAssetForBatches, setSelectedAssetForBatches] = useState<AssetRow | null>(null);
   const addAssignmentRow = () =>
-    setAssignmentRows((rows) => [...rows, { pump_id: null, quantity: null }]);
+    setAssignmentRows((rows) => [...rows, { pump_id: null, quantity: null, batch_id: null }]);
   const removeAssignmentRow = (index: number) =>
     setAssignmentRows((rows) => rows.filter((_, idx) => idx !== index));
   const updateAssignmentRow = (
@@ -128,12 +138,29 @@ export default function AllAssetsPage() {
       setAssignmentError("");
       return;
     }
-    if (remainingDraft < 0) {
-      setAssignmentError("Assigned quantity exceeds available stock.");
-    } else {
-      setAssignmentError("");
+    
+    // Validate batch selections and quantities
+    let error = "";
+    for (const row of assignmentRows) {
+      if (row.pump_id && !row.batch_id) {
+        error = "Please select a batch for all assignments.";
+        break;
+      }
+      if (row.batch_id && row.quantity) {
+        const batch = availableBatches.find((b) => b.id === row.batch_id);
+        if (batch && row.quantity > batch.remaining_quantity) {
+          error = `Quantity exceeds available stock in selected batch (${batch.remaining_quantity} available).`;
+          break;
+        }
+      }
     }
-  }, [assignOpen, remainingDraft]);
+    
+    if (!error && remainingDraft < 0) {
+      error = "Assigned quantity exceeds available stock.";
+    }
+    
+    setAssignmentError(error);
+  }, [assignOpen, remainingDraft, assignmentRows, availableBatches]);
 
   // Load all assets
   const loadAssets = async () => {
@@ -241,11 +268,9 @@ export default function AllAssetsPage() {
                 <th>ID</th>
                 <th>Asset Name</th>
                 <th>Asset #</th>
-                <th>Serial #</th>
                 <th>Barcode</th>
                 <th>Quantity</th>
                 <th>Units</th>
-                <th>Unit Value</th>
                 <th>Total Value</th>
                 <th>Remarks</th>
                 <th>Category</th>
@@ -260,11 +285,9 @@ export default function AllAssetsPage() {
                     <td>${a.id}</td>
                     <td>${a.asset_name ?? ""}</td>
                     <td>${a.asset_number ?? ""}</td>
-                    <td>${a.serial_number ?? ""}</td>
                     <td>${a.barcode ?? ""}</td>
                     <td>${a.quantity ?? ""}</td>
                     <td>${a.units ?? ""}</td>
-                    <td>${a.asset_value ?? 0}</td>
                     <td>${a.totalValue ?? 0}</td>
                     <td>${a.remarks ?? ""}</td>
                     <td>${a.categoryName ?? "-"}</td>
@@ -296,15 +319,45 @@ export default function AllAssetsPage() {
   const openAssign = async (asset: AssetRow) => {
     setSelected(asset);
     setAssignCatId(asset.category_id ?? "none");
-    setAssignmentRows(
-      asset.assignments && asset.assignments.length > 0
-        ? asset.assignments.map((assignment) => ({
-            id: assignment.id,
-            pump_id: assignment.pump_id,
-            quantity: assignment.quantity,
-          }))
-        : [{ pump_id: null, quantity: null }]
-    );
+    
+    // Fetch batches for this asset first
+    let allBatches: any[] = [];
+    try {
+      const batchesRes = await fetch(`${API_BASE}/api/assets/${asset.id}/batches`, { credentials: "include" });
+      const batchesData = await batchesRes.json();
+      allBatches = Array.isArray(batchesData) ? batchesData : [];
+      setAvailableBatches(allBatches.filter((b: any) => b.remaining_quantity > 0));
+    } catch (e) {
+      console.error("Failed to fetch batches", e);
+      setAvailableBatches([]);
+    }
+
+    // Load existing assignments with their batch allocations
+    if (asset.assignments && asset.assignments.length > 0) {
+      // For each assignment, get the batch_id from batch_allocations
+      // If an assignment has multiple batch allocations, we'll use the first one
+      const assignmentRowsWithBatches = asset.assignments.map((assignment: any) => {
+        let batchId: number | null = null;
+        
+        // Check if assignment has batch_allocations
+        if (assignment.batch_allocations && assignment.batch_allocations.length > 0) {
+          // Use the first batch allocation's batch_id
+          batchId = assignment.batch_allocations[0].batch_id;
+        }
+        
+        return {
+          id: assignment.id,
+          pump_id: assignment.pump_id,
+          quantity: assignment.quantity,
+          batch_id: batchId,
+        };
+      });
+      
+      setAssignmentRows(assignmentRowsWithBatches);
+    } else {
+      setAssignmentRows([{ pump_id: null, quantity: null, batch_id: null }]);
+    }
+    
     setAssignmentError("");
 
     // Fetch dropdowns (cached)
@@ -382,8 +435,6 @@ export default function AllAssetsPage() {
               <TableHead>ID</TableHead>
               <TableHead>Asset Name</TableHead>
               <TableHead>Asset #</TableHead>
-              <TableHead>Serial #</TableHead>
-              <TableHead>Unit Value</TableHead>
               <TableHead>Total Value</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Station</TableHead>
@@ -396,8 +447,6 @@ export default function AllAssetsPage() {
                 <TableCell>{a.id}</TableCell>
                 <TableCell>{a.asset_name}</TableCell>
                 <TableCell>{a.asset_number}</TableCell>
-                <TableCell>{a.serial_number}</TableCell>
-                <TableCell>{a.asset_value ?? 0}</TableCell>
                 <TableCell>{a.totalValue ?? 0}</TableCell>
                 <TableCell>{a.categoryName ?? "-"}</TableCell>
                 <TableCell>
@@ -419,6 +468,18 @@ export default function AllAssetsPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setSelectedAssetForBatches(a);
+                        setShowViewBatches(true);
+                      }} 
+                      className="text-xs"
+                      title="View Purchase Batches"
+                    >
+                      Batches
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => openDetails(a)} className="text-xs">Details</Button>
                     <Button variant="outline" size="sm" onClick={() => openAssign(a)} className="text-xs">Assign</Button>
                   </div>
@@ -440,53 +501,158 @@ export default function AllAssetsPage() {
           </DialogHeader>
 
           {selected && (
-            <form className="grid grid-cols-1 sm:grid-cols-2 gap-4" onSubmit={(e) => e.preventDefault()}>
-              {(
-                [
-                  ["asset_name", "Asset Name"],
-                  ["asset_number", "Asset #"],
-                  ["serial_number", "Serial #"],
-                  ["barcode", "Barcode"],
-                  ["quantity", "Quantity"],
-                  ["units", "Units"],
-                  ["asset_value", "Value"], // ✅ Added
-                  ["remarks", "Remarks"],
-                ] as const
-              ).map(([key, label]) => (
-                <div className="col-span-1 sm:col-span-1" key={key}>
-                  <Label>{label}</Label>
-                  <Input
-                    type={key === "asset_value" ? "number" : "text"}
-                    step={key === "asset_value" ? "0.01" : undefined}
-                    value={(selected as any)[key] ?? ""}
-                    disabled={!editMode}
-                    onChange={(e) => {
-                      const isNumeric = key === "asset_value" || key === "quantity";
-                      const nextValue = isNumeric
-                        ? e.target.value === ""
-                          ? null
-                          : Number(e.target.value)
-                        : e.target.value;
-                      setSelected({ ...selected, [key]: nextValue });
-                    }}
-                  />
+            <>
+              <form className="grid grid-cols-1 sm:grid-cols-2 gap-4" onSubmit={(e) => e.preventDefault()}>
+                {(
+                  [
+                    ["asset_name", "Asset Name"],
+                    ["asset_number", "Asset #"],
+                    ["serial_number", "Serial #"],
+                    ["barcode", "Barcode"],
+                    ["quantity", "Quantity"],
+                    ["units", "Units"],
+                    ["categoryName", "Category"],
+                    ["asset_value", "Unit Value"],
+                  ] as const
+                ).map(([key, label]) => {
+                  const keyName = key as string;
+                  const isNumeric = detailNumericFields.has(keyName);
+                  const isReadOnly = detailReadOnlyFields.has(keyName);
+                  return (
+                    <div className="col-span-1 sm:col-span-1" key={key}>
+                      <Label>{label}</Label>
+                      <Input
+                        type={isNumeric ? "number" : "text"}
+                        value={(selected as any)[key] ?? ""}
+                        disabled={!editMode || isReadOnly}
+                        onChange={
+                          isReadOnly
+                            ? undefined
+                            : (e) => {
+                                const nextValue = isNumeric
+                                  ? e.target.value === ""
+                                    ? null
+                                    : Number(e.target.value)
+                                  : e.target.value;
+                                setSelected({ ...selected, [key]: nextValue });
+                              }
+                        }
+                      />
+                    </div>
+                  );
+                })}
+                <div className="col-span-1 sm:col-span-2">
+                  <Label>Remarks</Label>
+                  <div className="border rounded-md p-2 text-sm text-muted-foreground min-h-[44px]">
+                    {selected.remarks && selected.remarks.trim().length > 0
+                      ? selected.remarks
+                      : "—"}
+                  </div>
                 </div>
-              ))}
 
-              <div className="col-span-1 sm:col-span-2 flex flex-col-reverse sm:flex-row justify-between gap-2 mt-4">
-                {!editMode ? (
-                  <>
-                    <Button type="button" variant="outline" onClick={() => setEditMode(true)} className="w-full sm:w-auto">✏️ Edit</Button>
-                    <Button type="button" variant="destructive" onClick={() => deleteAsset(selected.id)} className="w-full sm:w-auto">🗑️ Delete</Button>
-                  </>
+                <div className="col-span-1 sm:col-span-2 flex flex-col-reverse sm:flex-row justify-between gap-2 mt-4">
+                  {!editMode ? (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => setEditMode(true)} className="w-full sm:w-auto">✏️ Edit</Button>
+                      <Button type="button" variant="destructive" onClick={() => deleteAsset(selected.id)} className="w-full sm:w-auto">🗑️ Delete</Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => setEditMode(false)} className="w-full sm:w-auto">Cancel</Button>
+                      <Button type="button" onClick={saveEdit} className="w-full sm:w-auto">💾 Save</Button>
+                    </>
+                  )}
+                </div>
+              </form>
+
+              {/* Show Batches Section */}
+              <div className="mt-6 pt-6 border-t">
+                <h3 className="text-lg font-semibold mb-3">Purchase Batches</h3>
+                {selected.batches && selected.batches.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-9 gap-2 text-xs font-semibold text-muted-foreground pb-2 border-b">
+                      <div>Date</div>
+                      <div>Serial #</div>
+                      <div>Barcode</div>
+                      <div>Price</div>
+                      <div>Quantity</div>
+                      <div>Remaining</div>
+                      <div>Remarks</div>
+                      <div>Value</div>
+                      <div className="text-right">Action</div>
+                    </div>
+                    {selected.batches.map((batch: any) => {
+                      const used = batch.quantity - batch.remaining_quantity;
+                      const batchValue = batch.quantity * batch.purchase_price;
+                      const remainingValue = batch.remaining_quantity * batch.purchase_price;
+                      const canDelete = batch.remaining_quantity === batch.quantity; // Only if unused
+                      return (
+                        <div key={batch.id} className="grid grid-cols-9 gap-2 text-sm py-2 border-b items-center">
+                          <div className="font-mono text-xs">{new Date(batch.purchase_date).toLocaleDateString()}</div>
+                          <div className="font-mono text-xs">{batch.serial_number ?? "—"}</div>
+                          <div className="font-mono text-xs">{batch.barcode ?? "—"}</div>
+                          <div className="font-semibold">{batch.purchase_price.toLocaleString()}</div>
+                          <div>{batch.quantity}</div>
+                          <div className={batch.remaining_quantity === 0 ? "text-muted-foreground" : ""}>{batch.remaining_quantity}</div>
+                          <div className="text-sm text-muted-foreground truncate">{batch.remarks ?? "—"}</div>
+                          <div>
+                            <div className="font-semibold">{batchValue.toLocaleString()}</div>
+                            <div className="text-xs text-muted-foreground">
+                              Used: {used} · Remaining Value: {remainingValue.toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={async () => {
+                                if (!confirm("Are you sure you want to delete this batch? This cannot be undone.")) {
+                                  return;
+                                }
+                                
+                                if (!canDelete) {
+                                  alert("You can only delete batches that haven't been used (remaining quantity equals total quantity).");
+                                  return;
+                                }
+
+                                try {
+                                  const res = await fetch(`${API_BASE}/api/assets/${selected.id}/batches/${batch.id}`, {
+                                    method: "DELETE",
+                                    credentials: "include",
+                                  });
+
+                                  if (!res.ok) {
+                                    const errorData = await res.json().catch(() => ({}));
+                                    throw new Error(errorData.message || "Failed to delete batch");
+                                  }
+
+                                  // Reload assets to refresh the data
+                                  await loadAssets();
+                                  // Update selected asset
+                                  const updatedAsset = assets.find((a) => a.id === selected.id);
+                                  if (updatedAsset) {
+                                    setSelected(updatedAsset);
+                                  }
+                                } catch (err: any) {
+                                  alert(err?.message || "Error deleting batch");
+                                }
+                              }}
+                              disabled={!canDelete}
+                              title={canDelete ? "Delete batch" : "Cannot delete used batch"}
+                              className="h-8 w-8"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
-                  <>
-                    <Button type="button" variant="outline" onClick={() => setEditMode(false)} className="w-full sm:w-auto">Cancel</Button>
-                    <Button type="button" onClick={saveEdit} className="w-full sm:w-auto">💾 Save</Button>
-                  </>
+                  <p className="text-sm text-muted-foreground">No purchase batches found for this asset.</p>
                 )}
               </div>
-            </form>
+            </>
           )}
         </DialogContent>
       </Dialog>
@@ -497,7 +663,7 @@ export default function AllAssetsPage() {
           <DialogHeader>
             <DialogTitle>Assign Asset</DialogTitle>
             <DialogDescription>
-              Split the asset quantity across stations and optionally update category.
+              Assign assets from specific batches to stations. Each assignment must specify which batch to use.
             </DialogDescription>
           </DialogHeader>
 
@@ -521,58 +687,97 @@ export default function AllAssetsPage() {
                 </p>
               )}
 
-              {assignmentRows.map((row, index) => (
-                <div key={index} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
-                  <div className="col-span-1 sm:col-span-3">
-                    <Label className="text-xs uppercase tracking-wide">Pump</Label>
-                    <Select
-                      value={row.pump_id?.toString() ?? "none"}
-                      onValueChange={(val) =>
-                        updateAssignmentRow(index, {
-                          pump_id: val === "none" ? null : Number(val),
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Pump" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Unassigned</SelectItem>
-                        {pumps.map((p) => (
-                          <SelectItem key={p.id} value={p.id.toString()}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {assignmentRows.map((row, index) => {
+                const selectedBatch = availableBatches.find((b) => b.id === row.batch_id);
+                const maxQuantity = selectedBatch ? selectedBatch.remaining_quantity : 0;
+                return (
+                  <div key={index} className="space-y-2 p-3 border rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs uppercase tracking-wide">Pump</Label>
+                        <Select
+                          value={row.pump_id?.toString() ?? "none"}
+                          onValueChange={(val) =>
+                            updateAssignmentRow(index, {
+                              pump_id: val === "none" ? null : Number(val),
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Pump" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Unassigned</SelectItem>
+                            {pumps.map((p) => (
+                              <SelectItem key={p.id} value={p.id.toString()}>
+                                {p.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs uppercase tracking-wide">Batch</Label>
+                        <Select
+                          value={row.batch_id?.toString() ?? "none"}
+                          onValueChange={(val) =>
+                            updateAssignmentRow(index, {
+                              batch_id: val === "none" ? null : Number(val),
+                              quantity: null, // Reset quantity when batch changes
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Batch" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Select Batch</SelectItem>
+                            {availableBatches.map((batch) => (
+                              <SelectItem key={batch.id} value={batch.id.toString()}>
+                                {new Date(batch.purchase_date).toLocaleDateString()} - {batch.purchase_price.toLocaleString()} ({batch.remaining_quantity} available)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="sm:col-span-2">
+                        <Label className="text-xs uppercase tracking-wide">Quantity</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={maxQuantity}
+                          value={row.quantity ?? ""}
+                          onChange={(e) =>
+                            updateAssignmentRow(index, {
+                              quantity:
+                                e.target.value === "" ? null : Number(e.target.value),
+                            })
+                          }
+                          disabled={!row.batch_id}
+                        />
+                        {selectedBatch && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Max: {maxQuantity} available
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          onClick={() => removeAssignmentRow(index)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="col-span-1 sm:col-span-2">
-                    <Label className="text-xs uppercase tracking-wide">Quantity</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={row.quantity ?? ""}
-                      onChange={(e) =>
-                        updateAssignmentRow(index, {
-                          quantity:
-                            e.target.value === "" ? null : Number(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="col-span-1 sm:col-span-5 flex justify-start sm:justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive"
-                      onClick={() => removeAssignmentRow(index)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div className="text-sm">
                 <span>Total assigned: </span>
@@ -619,6 +824,18 @@ export default function AllAssetsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* View Batches Modal */}
+      <ViewBatchesModal
+        open={showViewBatches}
+        onClose={() => {
+          setShowViewBatches(false);
+          setSelectedAssetForBatches(null);
+        }}
+        assetId={selectedAssetForBatches?.id || 0}
+        assetName={selectedAssetForBatches?.asset_name || ""}
+        onRefresh={loadAssets}
+      />
     </div>
   );
 }
