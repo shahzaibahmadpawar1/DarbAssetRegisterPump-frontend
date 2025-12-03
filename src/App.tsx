@@ -9,6 +9,7 @@ import Header from "./components/Header";
 import Dashboard from "./pages/Dashboard";
 import Assets from "./pages/Assets";
 import Categories from "./pages/Categories";
+import Employees from "./pages/Employees";
 import HomeDashboard from "./pages/HomeDashboard";
 import AssetsByCategoryReport from "./pages/reports/AssetsByCategory";
 import AllAssetsReport from "./pages/reports/AllAssets";
@@ -23,6 +24,7 @@ type View =
   | "dashboard"
   | "assets"
   | "categories"
+  | "employees"
   | "r-assets-by-cat"
   | "r-all-assets"
   | "r-all-stations";
@@ -75,6 +77,7 @@ function App() {
             "dashboard",
             "assets",
             "categories",
+            "employees",
             "r-assets-by-cat",
             "r-all-assets",
             "r-all-stations",
@@ -115,6 +118,7 @@ function App() {
             "dashboard",
             "assets",
             "categories",
+            "employees",
             "r-assets-by-cat",
             "r-all-assets",
             "r-all-stations",
@@ -240,6 +244,7 @@ function App() {
                 onGoPumps={() => setPumpFormOpen(true)}
                 onGoAssets={() => setAssetFormOpen(true)}
                 onGoAddCategory={() => navigate("categories")}
+                onGoAddEmployee={() => navigate("employees")}
                 onGoReportAssetsByCategory={() => navigate("r-assets-by-cat")}
                 onGoReportAllAssets={() => navigate("r-all-assets")}
                 onGoReportAllStations={() => navigate("r-all-stations")}
@@ -258,6 +263,7 @@ function App() {
             )}
 
             {currentView === "categories" && <Categories />}
+            {currentView === "employees" && <Employees />}
             {currentView === "r-assets-by-cat" && <AssetsByCategoryReport />}
             {currentView === "r-all-assets" && <AllAssetsReport />}
             {currentView === "r-all-stations" && <AllStationsReport />}

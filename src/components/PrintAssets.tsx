@@ -8,7 +8,7 @@ interface PrintAssetsProps {
 }
 
 export default function PrintAssets({
-  pumpName = "All Stations",
+  pumpName = "All Stations/Departments",
   location = "—",
   manager = "—",
   assets,
@@ -30,7 +30,7 @@ export default function PrintAssets({
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
           <div className="text-sm text-muted-foreground">{currentDate}, {currentTime}</div>
-          <div className="text-sm text-muted-foreground">Petrol Pump Details</div>
+          <div className="text-sm text-muted-foreground">Station/Department Details</div>
         </div>
 
         {/* Pump Details */}
@@ -77,7 +77,7 @@ export default function PrintAssets({
                     ? asset.assignments
                         .map(
                           (assignment) =>
-                            `${assignment.pump_name || `Pump #${assignment.pump_id}`}: ${
+                            `${assignment.pump_name || `Station/Department #${assignment.pump_id}`}: ${
                               assignment.quantity
                             }`
                         )

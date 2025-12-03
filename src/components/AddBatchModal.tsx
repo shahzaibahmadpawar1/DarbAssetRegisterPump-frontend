@@ -26,6 +26,7 @@ interface BatchFormData {
   purchase_price: number;
   quantity: number;
   purchase_date: string;
+  batch_name?: string;
   remarks?: string;
 }
 
@@ -43,6 +44,7 @@ export default function AddBatchModal({
       purchase_price: 0,
       quantity: 1,
       purchase_date: new Date().toISOString().split("T")[0],
+      batch_name: "",
       remarks: "",
     },
   });
@@ -62,6 +64,7 @@ export default function AddBatchModal({
           purchase_price: Number(data.purchase_price),
           quantity: Number(data.quantity),
           purchase_date: data.purchase_date ? new Date(data.purchase_date).toISOString() : undefined,
+          batch_name: data.batch_name?.trim() || null,
           remarks: data.remarks || null,
         }),
       });
@@ -161,6 +164,16 @@ export default function AddBatchModal({
                 {errors.quantity.message}
               </p>
             )}
+          </div>
+
+          <div>
+            <Label htmlFor="batch_name">Batch Name (optional)</Label>
+            <Input
+              id="batch_name"
+              type="text"
+              {...register("batch_name")}
+              placeholder="Enter a name for this batch"
+            />
           </div>
 
           <div>

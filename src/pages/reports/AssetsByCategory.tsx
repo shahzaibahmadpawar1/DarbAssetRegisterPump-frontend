@@ -28,6 +28,12 @@ type Pump = {
   name: string;
 };
 
+type Employee = {
+  id: number;
+  name: string;
+  employee_id?: string | null;
+};
+
 type Asset = {
   id: number;
   asset_name: string;
@@ -46,8 +52,10 @@ type Asset = {
 export default function AssetsByCategoryReport() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [pumps, setPumps] = useState<Pump[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [categoryId, setCategoryId] = useState<string>("all");
   const [pumpId, setPumpId] = useState<string>("all");
+  const [employeeId, setEmployeeId] = useState<string>("all");
   const [assets, setAssets] = useState<Asset[]>([]);
 
   // Load categories
@@ -82,6 +90,22 @@ export default function AssetsByCategoryReport() {
     loadPumps();
   }, []);
 
+  // Load employees
+  useEffect(() => {
+    async function loadEmployees() {
+      try {
+        const res = await fetch(`${API_BASE}/api/employees`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        setEmployees(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load employees:", err);
+      }
+    }
+    loadEmployees();
+  }, []);
+
   // Load assets (filtered by category and/or pump)
   useEffect(() => {
     async function loadAssets() {
@@ -91,6 +115,7 @@ export default function AssetsByCategoryReport() {
         const params = new URLSearchParams();
         if (categoryId !== "all") params.append("category_id", categoryId);
         if (pumpId !== "all") params.append("pump_id", pumpId);
+        if (employeeId !== "all") params.append("employee_id", employeeId);
 
         if (params.toString()) url += `?${params.toString()}`;
 
@@ -104,7 +129,7 @@ export default function AssetsByCategoryReport() {
     }
 
     loadAssets();
-  }, [categoryId, pumpId]);
+  }, [categoryId, pumpId, employeeId]);
 
   const selectedPumpName =
     pumpId === "all"
@@ -219,16 +244,34 @@ export default function AssetsByCategoryReport() {
 
         {/* Pump Filter */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
-          <span className="font-semibold text-sm sm:text-base shrink-0">Station:</span>
+          <span className="font-semibold text-sm sm:text-base shrink-0">Station/Department:</span>
           <Select value={pumpId} onValueChange={setPumpId}>
             <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder="Select pump" />
+              <SelectValue placeholder="Select Station/Department" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Stations</SelectItem>
               {pumps.map((p) => (
                 <SelectItem key={p.id} value={p.id.toString()}>
                   {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Employee Filter */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
+          <span className="font-semibold text-sm sm:text-base shrink-0">Employee:</span>
+          <Select value={employeeId} onValueChange={setEmployeeId}>
+            <SelectTrigger className="w-full sm:w-64">
+              <SelectValue placeholder="Select Employee" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Employees</SelectItem>
+              {employees.map((e) => (
+                <SelectItem key={e.id} value={e.id.toString()}>
+                  {e.name} {e.employee_id ? `(${e.employee_id})` : ""}
                 </SelectItem>
               ))}
             </SelectContent>

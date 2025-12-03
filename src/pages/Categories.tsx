@@ -3,7 +3,7 @@ import { API_BASE } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import BackToDashboardButton from "@/components/BackToDashboardButton";``
+import BackToDashboardButton from "@/components/BackToDashboardButton";
 
 type Category = { id: string; name: string };
 

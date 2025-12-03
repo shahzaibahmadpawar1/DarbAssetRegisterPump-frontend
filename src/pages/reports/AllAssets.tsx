@@ -38,12 +38,21 @@ type AssetRow = Asset & {
 
 type Pump = { id: number; name: string };
 type Category = { id: string; name: string };
+type Employee = { id: number; name: string; employee_id?: string | null };
 
 type AssignmentDraft = {
   id?: number;
   pump_id: number | null;
   quantity: number | null;
   batch_id: number | null; // Selected batch for this assignment
+};
+
+type EmployeeAssignmentDraft = {
+  id?: number;
+  employee_id: number | null;
+  quantity: number | null;
+  batch_id: number | null;
+  assignment_date: string | null;
 };
 
 const sanitizeAssignmentDrafts = (rows: AssignmentDraft[]) =>
@@ -99,6 +108,12 @@ export default function AllAssetsPage() {
   const [assignmentError, setAssignmentError] = useState<string>("");
   const [availableBatches, setAvailableBatches] = useState<any[]>([]);
   
+  // Employee assign modal state
+  const [employeeAssignOpen, setEmployeeAssignOpen] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeAssignmentRows, setEmployeeAssignmentRows] = useState<EmployeeAssignmentDraft[]>([]);
+  const [employeeAssignmentError, setEmployeeAssignmentError] = useState<string>("");
+  
   // View batches modal state
   const [showViewBatches, setShowViewBatches] = useState(false);
   const [selectedAssetForBatches, setSelectedAssetForBatches] = useState<AssetRow | null>(null);
@@ -111,6 +126,20 @@ export default function AllAssetsPage() {
     next: Partial<AssignmentDraft>
   ) => {
     setAssignmentRows((rows) =>
+      rows.map((row, idx) => (idx === index ? { ...row, ...next } : row))
+    );
+  };
+
+  // Employee assignment functions
+  const addEmployeeAssignmentRow = () =>
+    setEmployeeAssignmentRows((rows) => [...rows, { employee_id: null, quantity: null, batch_id: null, assignment_date: new Date().toISOString().split("T")[0] }]);
+  const removeEmployeeAssignmentRow = (index: number) =>
+    setEmployeeAssignmentRows((rows) => rows.filter((_, idx) => idx !== index));
+  const updateEmployeeAssignmentRow = (
+    index: number,
+    next: Partial<EmployeeAssignmentDraft>
+  ) => {
+    setEmployeeAssignmentRows((rows) =>
       rows.map((row, idx) => (idx === index ? { ...row, ...next } : row))
     );
   };
@@ -133,24 +162,63 @@ export default function AllAssetsPage() {
     [assets]
   );
 
+  // 🟢 1. Calculate how much of each batch was ALREADY used by this asset 
+  // before we started editing. We credit this back to "Available" capacity.
+  const originalBatchUsage = useMemo(() => {
+    const map = new Map<number, number>();
+    if (!selected?.assignments) return map;
+
+    selected.assignments.forEach((assign: any) => {
+      // The backend returns batch_allocations inside assignments
+      if (assign.batch_allocations && Array.isArray(assign.batch_allocations)) {
+        assign.batch_allocations.forEach((alloc: any) => {
+          const current = map.get(alloc.batch_id) || 0;
+          map.set(alloc.batch_id, current + Number(alloc.quantity));
+        });
+      }
+    });
+    return map;
+  }, [selected]);
+
+  // 🟢 2. UPDATED: Validation Logic using True Limit
   useEffect(() => {
     if (!assignOpen) {
       setAssignmentError("");
       return;
     }
     
-    // Validate batch selections and quantities
     let error = "";
+    
+    // Calculate requested usage per batch in the current form
+    const currentDraftUsage = new Map<number, number>();
+
     for (const row of assignmentRows) {
-      if (row.pump_id && !row.batch_id) {
-        error = "Please select a batch for all assignments.";
-        break;
+      if (!row.batch_id) {
+        if (row.pump_id) {
+           error = "Please select a batch for all assignments.";
+           break;
+        }
+        continue;
       }
-      if (row.batch_id && row.quantity) {
-        const batch = availableBatches.find((b) => b.id === row.batch_id);
-        if (batch && row.quantity > batch.remaining_quantity) {
-          error = `Quantity exceeds available stock in selected batch (${batch.remaining_quantity} available).`;
-          break;
+      const current = currentDraftUsage.get(row.batch_id) || 0;
+      currentDraftUsage.set(row.batch_id, current + (Number(row.quantity) || 0));
+    }
+    
+    if (!error) {
+      for (const [batchId, requestedQty] of currentDraftUsage.entries()) {
+        const batch = availableBatches.find((b) => b.id === batchId);
+        
+        if (batch) {
+          const dbRemaining = batch.remaining_quantity || 0;
+          const originalUsage = originalBatchUsage.get(batchId) || 0;
+          
+          // ✨ Allowable = What's in DB + What we are currently holding
+          const trueLimit = dbRemaining + originalUsage;
+
+          if (requestedQty > trueLimit) {
+            error = `Quantity for batch (${new Date(batch.purchase_date).toLocaleDateString()}) exceeds limit. Available: ${trueLimit} (Requested: ${requestedQty})`;
+            break;
+          }
         }
       }
     }
@@ -160,7 +228,7 @@ export default function AllAssetsPage() {
     }
     
     setAssignmentError(error);
-  }, [assignOpen, remainingDraft, assignmentRows, availableBatches]);
+  }, [assignOpen, remainingDraft, assignmentRows, availableBatches, originalBatchUsage]);
 
   // Load all assets
   const loadAssets = async () => {
@@ -296,7 +364,7 @@ export default function AllAssetsPage() {
                         ? a.assignments
                             .map(
                               (as) =>
-                                `${as.pump_name || `Pump #${as.pump_id}`}: ${as.quantity}`
+                                `${as.pump_name || `Station/Department #${as.pump_id}`}: ${as.quantity}`
                             )
                             .join("<br/>")
                         : "-"
@@ -406,6 +474,116 @@ export default function AllAssetsPage() {
     setAssignOpen(false);
   };
 
+  // ---- EMPLOYEE ASSIGN MODAL ----
+  const openEmployeeAssign = async (asset: AssetRow) => {
+    setSelected(asset);
+    
+    // Fetch batches for this asset
+    let allBatches: any[] = [];
+    try {
+      const batchesRes = await fetch(`${API_BASE}/api/assets/${asset.id}/batches`, { credentials: "include" });
+      const batchesData = await batchesRes.json();
+      allBatches = Array.isArray(batchesData) ? batchesData : [];
+      setAvailableBatches(allBatches.filter((b: any) => b.remaining_quantity > 0));
+    } catch (e) {
+      console.error("Failed to fetch batches", e);
+      setAvailableBatches([]);
+    }
+    
+    // Initialize with one empty row
+    setEmployeeAssignmentRows([{ employee_id: null, quantity: null, batch_id: null, assignment_date: new Date().toISOString().split("T")[0] }]);
+    setEmployeeAssignmentError("");
+
+    // Fetch employees
+    if (employees.length === 0) {
+      try {
+        const r = await fetch(`${API_BASE}/api/employees`, { credentials: "include" });
+        const data = await r.json();
+        setEmployees(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error("Failed to load employees", e);
+      }
+    }
+    setEmployeeAssignOpen(true);
+  };
+
+  // Validation for employee assignments
+  useEffect(() => {
+    if (!employeeAssignOpen) {
+      setEmployeeAssignmentError("");
+      return;
+    }
+    
+    let error = "";
+    
+    // Calculate requested usage per batch
+    const currentDraftUsage = new Map<number, number>();
+    for (const row of employeeAssignmentRows) {
+      if (!row.batch_id) {
+        if (row.employee_id) {
+          error = "Please select a batch for all assignments.";
+          break;
+        }
+        continue;
+      }
+      const current = currentDraftUsage.get(row.batch_id) || 0;
+      currentDraftUsage.set(row.batch_id, current + (Number(row.quantity) || 0));
+    }
+    
+    if (!error) {
+      for (const [batchId, requestedQty] of currentDraftUsage.entries()) {
+        const batch = availableBatches.find((b) => b.id === batchId);
+        if (batch && requestedQty > batch.remaining_quantity) {
+          error = `Quantity for batch exceeds limit. Available: ${batch.remaining_quantity} (Requested: ${requestedQty})`;
+          break;
+        }
+      }
+    }
+    
+    setEmployeeAssignmentError(error);
+  }, [employeeAssignOpen, employeeAssignmentRows, availableBatches]);
+
+  const saveEmployeeAssign = async () => {
+    if (!selected) return;
+    if (employeeAssignmentError) return;
+
+    // Save each employee assignment
+    const validRows = employeeAssignmentRows.filter(
+      (row) => row.employee_id != null && row.batch_id != null && row.quantity != null && Number(row.quantity) > 0
+    );
+
+    if (validRows.length === 0) {
+      alert("Please add at least one employee assignment.");
+      return;
+    }
+
+    try {
+      for (const row of validRows) {
+        const res = await fetch(`${API_BASE}/api/employees/${row.employee_id}/assignments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            batch_id: row.batch_id,
+            quantity: Number(row.quantity),
+            assignment_date: row.assignment_date || new Date().toISOString(),
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to assign to employee");
+        }
+      }
+
+      // Reload assets to refresh data
+      await loadAssets();
+      setEmployeeAssignOpen(false);
+      alert("✅ Assets assigned to employees successfully!");
+    } catch (err: any) {
+      alert(err?.message || "Error assigning assets to employees");
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
@@ -454,7 +632,7 @@ export default function AllAssetsPage() {
                     <div className="flex flex-col text-sm text-muted-foreground">
                       {a.assignments.slice(0, 2).map((assignment) => (
                         <span key={assignment.id}>
-                          {assignment.pump_name || `Pump #${assignment.pump_id}`} ·{" "}
+                          {assignment.pump_name || `Station/Department #${assignment.pump_id}`} ·{" "}
                           {assignment.quantity}
                         </span>
                       ))}
@@ -482,6 +660,7 @@ export default function AllAssetsPage() {
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openDetails(a)} className="text-xs">Details</Button>
                     <Button variant="outline" size="sm" onClick={() => openAssign(a)} className="text-xs">Assign</Button>
+                    <Button variant="outline" size="sm" onClick={() => openEmployeeAssign(a)} className="text-xs">Assign to Employee</Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -570,7 +749,8 @@ export default function AllAssetsPage() {
                 <h3 className="text-lg font-semibold mb-3">Purchase Batches</h3>
                 {selected.batches && selected.batches.length > 0 ? (
                   <div className="space-y-2">
-                    <div className="grid grid-cols-9 gap-2 text-xs font-semibold text-muted-foreground pb-2 border-b">
+                    <div className="grid grid-cols-10 gap-2 text-xs font-semibold text-muted-foreground pb-2 border-b">
+                      <div>Name</div>
                       <div>Date</div>
                       <div>Serial #</div>
                       <div>Barcode</div>
@@ -587,7 +767,8 @@ export default function AllAssetsPage() {
                       const remainingValue = batch.remaining_quantity * batch.purchase_price;
                       const canDelete = batch.remaining_quantity === batch.quantity; // Only if unused
                       return (
-                        <div key={batch.id} className="grid grid-cols-9 gap-2 text-sm py-2 border-b items-center">
+                        <div key={batch.id} className="grid grid-cols-10 gap-2 text-sm py-2 border-b items-center">
+                          <div className="font-semibold">{batch.batch_name ?? "—"}</div>
                           <div className="font-mono text-xs">{new Date(batch.purchase_date).toLocaleDateString()}</div>
                           <div className="font-mono text-xs">{batch.serial_number ?? "—"}</div>
                           <div className="font-mono text-xs">{batch.barcode ?? "—"}</div>
@@ -673,7 +854,7 @@ export default function AllAssetsPage() {
                 <div className="flex-1">
                   <Label>Station Allocations</Label>
                   <p className="text-xs text-muted-foreground">
-                    Assign quantities to one or more petrol pumps.
+                    Assign quantities to one or more Stations/Departments.
                   </p>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={addAssignmentRow} className="shrink-0">
@@ -689,12 +870,19 @@ export default function AllAssetsPage() {
 
               {assignmentRows.map((row, index) => {
                 const selectedBatch = availableBatches.find((b) => b.id === row.batch_id);
-                const maxQuantity = selectedBatch ? selectedBatch.remaining_quantity : 0;
+                // 🟢 3. UPDATED: UI shows correct limit including what is currently used
+                let maxQuantity = 0;
+                if (selectedBatch) {
+                  const dbRemaining = selectedBatch.remaining_quantity || 0;
+                  const originalUsage = originalBatchUsage.get(selectedBatch.id) || 0;
+                  maxQuantity = dbRemaining + originalUsage;
+                }
+
                 return (
                   <div key={index} className="space-y-2 p-3 border rounded-lg">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
-                        <Label className="text-xs uppercase tracking-wide">Pump</Label>
+                        <Label className="text-xs uppercase tracking-wide">Station/Department</Label>
                         <Select
                           value={row.pump_id?.toString() ?? "none"}
                           onValueChange={(val) =>
@@ -704,7 +892,7 @@ export default function AllAssetsPage() {
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Select Pump" />
+                            <SelectValue placeholder="Select Station/Department" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">Unassigned</SelectItem>
@@ -734,7 +922,7 @@ export default function AllAssetsPage() {
                             <SelectItem value="none">Select Batch</SelectItem>
                             {availableBatches.map((batch) => (
                               <SelectItem key={batch.id} value={batch.id.toString()}>
-                                {new Date(batch.purchase_date).toLocaleDateString()} - {batch.purchase_price.toLocaleString()} ({batch.remaining_quantity} available)
+                                {batch.batch_name || "Unnamed"} - {new Date(batch.purchase_date).toLocaleDateString()} ({batch.remaining_quantity} available)
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -818,6 +1006,158 @@ export default function AllAssetsPage() {
                 Cancel
               </Button>
               <Button onClick={saveAssign} disabled={!!assignmentError} className="w-full sm:w-auto">
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* EMPLOYEE ASSIGN dialog */}
+      <Dialog open={employeeAssignOpen} onOpenChange={setEmployeeAssignOpen}>
+        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Assign Asset to Employee</DialogTitle>
+            <DialogDescription>
+              Assign assets from specific batches to employees. Each assignment must specify which batch to use.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div className="flex-1">
+                  <Label>Employee Assignments</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Assign quantities to one or more employees.
+                  </p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={addEmployeeAssignmentRow} className="shrink-0">
+                  Add Employee
+                </Button>
+              </div>
+
+              {employeeAssignmentRows.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No employees selected. Click "Add Employee" to assign assets.
+                </p>
+              )}
+
+              {employeeAssignmentRows.map((row, index) => {
+                const selectedBatch = availableBatches.find((b) => b.id === row.batch_id);
+                const maxQuantity = selectedBatch?.remaining_quantity || 0;
+
+                return (
+                  <div key={index} className="space-y-2 p-3 border rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs uppercase tracking-wide">Employee</Label>
+                        <Select
+                          value={row.employee_id?.toString() ?? "none"}
+                          onValueChange={(val) =>
+                            updateEmployeeAssignmentRow(index, {
+                              employee_id: val === "none" ? null : Number(val),
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Employee" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Select Employee</SelectItem>
+                            {employees.map((e) => (
+                              <SelectItem key={e.id} value={e.id.toString()}>
+                                {e.name} {e.employee_id ? `(${e.employee_id})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs uppercase tracking-wide">Batch</Label>
+                        <Select
+                          value={row.batch_id?.toString() ?? "none"}
+                          onValueChange={(val) =>
+                            updateEmployeeAssignmentRow(index, {
+                              batch_id: val === "none" ? null : Number(val),
+                              quantity: null, // Reset quantity when batch changes
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Batch" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Select Batch</SelectItem>
+                            {availableBatches.map((batch) => (
+                              <SelectItem key={batch.id} value={batch.id.toString()}>
+                                {batch.batch_name || "Unnamed"} - {new Date(batch.purchase_date).toLocaleDateString()} ({batch.remaining_quantity} available)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <Label className="text-xs uppercase tracking-wide">Quantity</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={maxQuantity}
+                          value={row.quantity ?? ""}
+                          onChange={(e) =>
+                            updateEmployeeAssignmentRow(index, {
+                              quantity:
+                                e.target.value === "" ? null : Number(e.target.value),
+                            })
+                          }
+                          disabled={!row.batch_id}
+                        />
+                        {selectedBatch && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Max: {maxQuantity} available
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label className="text-xs uppercase tracking-wide">Assignment Date</Label>
+                        <Input
+                          type="date"
+                          value={row.assignment_date ?? new Date().toISOString().split("T")[0]}
+                          onChange={(e) =>
+                            updateEmployeeAssignmentRow(index, {
+                              assignment_date: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          onClick={() => removeEmployeeAssignmentRow(index)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {employeeAssignmentError && (
+                <p className="text-sm text-destructive">{employeeAssignmentError}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-2">
+              <Button variant="outline" onClick={() => setEmployeeAssignOpen(false)} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button onClick={saveEmployeeAssign} disabled={!!employeeAssignmentError} className="w-full sm:w-auto">
                 Save
               </Button>
             </div>

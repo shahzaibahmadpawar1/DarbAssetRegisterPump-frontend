@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../components/ui/button";
 import PumpCard, { type Pump } from "../components/PumpCard";
 import PumpForm, { type PumpFormData } from "../components/PumpForm";
+import DepartmentForm, { type DepartmentFormData } from "../components/DepartmentForm";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog";
 import PrintPumps from "../components/PrintPumps";
 import { Plus, Printer, FileDown } from "lucide-react";
@@ -130,7 +131,7 @@ export default function Dashboard({
               }}
               className="gap-2"
             >
-              <Plus className="w-4 h-4" /> Add Pump
+              <Plus className="w-4 h-4" /> Add Station/Department
             </Button>
           </div>
         </div>
@@ -141,7 +142,7 @@ export default function Dashboard({
         ) : pumps.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-muted-foreground mb-4">
-              No petrol pumps added yet. Click “Add Pump” to get started.
+              No stations/departments added yet. Click "Add Station/Department" to get started.
             </p>
           </div>
         ) : (
@@ -180,7 +181,7 @@ export default function Dashboard({
               }
             : undefined
         }
-        title={editingPump ? "Edit Station" : "Add Station"}
+        title={editingPump ? "Edit Station" : "Add Station/Department"}
       />
       <DeleteConfirmDialog
         open={deletingPumpId !== null}

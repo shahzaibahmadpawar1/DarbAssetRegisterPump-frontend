@@ -118,7 +118,7 @@ export default function AssetTable({
                           key={assignment.id}
                           className="text-sm text-muted-foreground"
                         >
-                          {assignment.pump_name || `Pump #${assignment.pump_id}`} ·{" "}
+                          {assignment.pump_name || `Station/Department #${assignment.pump_id}`} ·{" "}
                           {assignment.quantity}
                         </span>
                       ))}

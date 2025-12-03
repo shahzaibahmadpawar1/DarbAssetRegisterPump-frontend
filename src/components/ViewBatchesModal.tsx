@@ -29,6 +29,7 @@ interface Batch {
   remaining_quantity: number;
   barcode?: string | null;
   serial_number?: string | null;
+  batch_name?: string | null;
   created_at: string;
 }
 
@@ -108,7 +109,8 @@ export default function ViewBatchesModal({
     purchasePrice: number,
     purchaseDate: string,
     serialNumber: string,
-    barcode: string
+    barcode: string,
+    batchName: string
   ) => {
     try {
       const res = await fetch(`${API_BASE}/api/assets/${assetId}/batches/${batchId}`, {
@@ -120,6 +122,7 @@ export default function ViewBatchesModal({
           purchase_date: purchaseDate ? new Date(purchaseDate).toISOString() : undefined,
           serial_number: serialNumber.trim(),
           barcode: barcode.trim(),
+          batch_name: batchName?.trim() || null,
         }),
       });
 
@@ -225,6 +228,7 @@ export default function ViewBatchesModal({
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Name</TableHead>
                     <TableHead>Purchase Date</TableHead>
                     <TableHead>Serial Number</TableHead>
                     <TableHead>Purchase Price</TableHead>
@@ -245,6 +249,9 @@ export default function ViewBatchesModal({
                       batch.remaining_quantity * batch.purchase_price;
                     return (
                       <TableRow key={batch.id}>
+                        <TableCell className="font-semibold">
+                          {batch.batch_name ?? "—"}
+                        </TableCell>
                         <TableCell className="font-mono text-sm">
                           {formatDate(batch.purchase_date)}
                         </TableCell>
@@ -335,8 +342,8 @@ export default function ViewBatchesModal({
             setEditingBatch(null);
           }}
           batch={editingBatch}
-          onSave={(price, date, serial, barcode) =>
-            handleUpdateBatch(editingBatch.id, price, date, serial, barcode)
+          onSave={(price, date, serial, barcode, batchName) =>
+            handleUpdateBatch(editingBatch.id, price, date, serial, barcode, batchName)
           }
         />
       )}
@@ -384,7 +391,7 @@ interface EditBatchModalProps {
   open: boolean;
   onClose: () => void;
   batch: Batch;
-  onSave: (price: number, date: string, serial: string, barcode: string) => void;
+  onSave: (price: number, date: string, serial: string, barcode: string, batchName: string) => void;
 }
 
 function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
@@ -394,6 +401,7 @@ function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
   );
   const [serial, setSerial] = useState(batch.serial_number ?? "");
   const [barcode, setBarcode] = useState(batch.barcode ?? "");
+  const [batchName, setBatchName] = useState(batch.batch_name ?? "");
 
   useEffect(() => {
     if (open) {
@@ -401,6 +409,7 @@ function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
       setDate(new Date(batch.purchase_date).toISOString().split("T")[0]);
       setSerial(batch.serial_number ?? "");
       setBarcode(batch.barcode ?? "");
+      setBatchName(batch.batch_name ?? "");
     }
   }, [open, batch]);
 
@@ -419,7 +428,7 @@ function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
       alert("Barcode is required.");
       return;
     }
-    onSave(numPrice, date, serial.trim(), barcode.trim());
+    onSave(numPrice, date, serial.trim(), barcode.trim(), batchName.trim());
   };
 
   return (
@@ -428,10 +437,14 @@ function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
         <DialogHeader>
           <DialogTitle>Edit Batch</DialogTitle>
           <DialogDescription>
-            Update the purchase price, date, or serial number for this batch. Note: Quantity cannot change.
+            Update the purchase price, date, serial number, or batch name for this batch. Note: Quantity cannot change.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div>
+            <Label>Batch Name (optional)</Label>
+            <Input value={batchName} onChange={(e) => setBatchName(e.target.value)} placeholder="Enter a name for this batch" />
+          </div>
           <div>
             <Label>Serial Number *</Label>
             <Input value={serial} onChange={(e) => setSerial(e.target.value)} required />

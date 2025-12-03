@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
-import {
-  Table,
-  TableHead,
-  TableRow,
-  TableHeader,
-  TableBody,
-  TableCell,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,7 +11,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
+import AllDepartmentsComponent from "./AllDepartments";
 
 type Pump = {
   id: number;
@@ -36,6 +31,7 @@ export default function AllStationsPage() {
   const [selected, setSelected] = useState<Pump | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"stations" | "departments">("stations");
 
   // 🟢 Fetch all stations
   useEffect(() => {
@@ -159,7 +155,7 @@ export default function AllStationsPage() {
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <BackToDashboardButton />
-        <h1 className="text-3xl font-bold">All Stations</h1>
+        <h1 className="text-3xl font-bold">All Stations/Departments</h1>
         <Button 
           onClick={handlePrint} 
           variant="outline"
@@ -169,42 +165,53 @@ export default function AllStationsPage() {
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg shadow-md">
-        <Table className="w-full">
-          <TableHeader className="bg-white/60 backdrop-blur-md">
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Manager</TableHead>
-              <TableHead>Assets</TableHead>
-              <TableHead>Action</TableHead>
-            </TableRow>
-          </TableHeader>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "stations" | "departments")} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsTrigger value="stations">Open Stations</TabsTrigger>
+          <TabsTrigger value="departments">Open Departments</TabsTrigger>
+        </TabsList>
 
-          <TableBody>
-            {stations.map((s) => (
-              <TableRow
-                key={s.id}
-                className="bg-white/60 hover:bg-white/80 transition"
+        <TabsContent value="stations">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {stations.map((s) => (
+          <Card
+            key={s.id}
+            className="bg-white/60 backdrop-blur-md hover:bg-white/80 transition hover:shadow-lg"
+          >
+            <CardHeader>
+              <CardTitle className="text-lg">{s.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div>
+                <span className="text-sm font-semibold">Location: </span>
+                <span className="text-sm text-muted-foreground">{s.location}</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold">Manager: </span>
+                <span className="text-sm text-muted-foreground">{s.manager}</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold">Assets: </span>
+                <span className="text-sm text-muted-foreground">{s.assetCount}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openDetails(s)}
+                className="w-full mt-4"
               >
-                <TableCell>{s.name}</TableCell>
-                <TableCell>{s.location}</TableCell>
-                <TableCell>{s.manager}</TableCell>
-                <TableCell>{s.assetCount}</TableCell>
-                <TableCell>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openDetails(s)}
-                  >
-                    Details
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+                Details
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="departments">
+          <AllDepartmentsComponent />
+        </TabsContent>
+      </Tabs>
 
       {/* 🧩 Modal for Details/Edit */}
       <Dialog open={open} onOpenChange={setOpen}>
@@ -257,10 +264,11 @@ export default function AllStationsPage() {
               <div className="col-span-2 flex justify-between mt-4">
                 {!editMode ? (
                   <>
-                    <Button variant="outline" onClick={() => setEditMode(true)}>
+                    <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
                       ✏️ Edit
                     </Button>
                     <Button
+                      type="button"
                       variant="destructive"
                       onClick={() => deleteStation(selected.id)}
                     >
@@ -270,12 +278,13 @@ export default function AllStationsPage() {
                 ) : (
                   <>
                     <Button
+                      type="button"
                       variant="outline"
                       onClick={() => setEditMode(false)}
                     >
                       Cancel
                     </Button>
-                    <Button onClick={saveEdit}>💾 Save</Button>
+                    <Button type="button" onClick={saveEdit}>💾 Save</Button>
                   </>
                 )}
               </div>
