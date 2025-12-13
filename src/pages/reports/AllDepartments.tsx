@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -18,12 +19,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Department = {
   id: number;
   name: string;
   manager: string;
   employeeCount?: number;
+  totalAssetValue?: number;
 };
 
 type Employee = {
@@ -49,6 +66,11 @@ export default function AllDepartmentsComponent() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departmentEmployees, setDepartmentEmployees] = useState<DepartmentEmployee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
+  const [employeeDetailsOpen, setEmployeeDetailsOpen] = useState(false);
+  const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState<Employee | null>(null);
+  const [employeeAssignments, setEmployeeAssignments] = useState<any[]>([]);
+  const [loadingEmployeeAssignments, setLoadingEmployeeAssignments] = useState(false);
 
   // Fetch all departments
   useEffect(() => {
@@ -92,10 +114,33 @@ export default function AllDepartmentsComponent() {
   };
 
   // Open details/edit
-  const openDetails = (dept: Department) => {
+  const openDetails = async (dept: Department) => {
     setSelected(dept);
     setEditMode(false);
     setOpen(true);
+    // Fetch employees for this department
+    await fetchDepartmentEmployees(dept.id);
+  };
+  
+  // Open employee details
+  const openEmployeeDetails = async (employee: Employee) => {
+    setSelectedEmployeeForDetails(employee);
+    setLoadingEmployeeAssignments(true);
+    setEmployeeDetailsOpen(true);
+    
+    try {
+      const res = await fetch(`${API_BASE}/api/employees/${employee.id}/assignments`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch employee assignments");
+      const data = await res.json();
+      setEmployeeAssignments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching employee assignments:", err);
+      setEmployeeAssignments([]);
+    } finally {
+      setLoadingEmployeeAssignments(false);
+    }
   };
 
   // Save edits
@@ -211,7 +256,22 @@ export default function AllDepartmentsComponent() {
             className="bg-white/60 backdrop-blur-md hover:bg-white/80 transition hover:shadow-lg"
           >
             <CardHeader>
-              <CardTitle className="text-lg">{d.name}</CardTitle>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-lg">{d.name}</CardTitle>
+                {d.totalAssetValue !== undefined && d.totalAssetValue > 0 && (
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">Total Value</div>
+                    <div className="text-lg font-bold text-orange-600">
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'SAR',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(d.totalAssetValue)}
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
               <div>
@@ -247,7 +307,7 @@ export default function AllDepartmentsComponent() {
 
       {/* Details/Edit Modal */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editMode ? "Edit Department" : "Department Details"}
@@ -260,7 +320,10 @@ export default function AllDepartmentsComponent() {
           </DialogHeader>
 
           {selected && (
-            <form className="grid grid-cols-2 gap-4">
+            <form 
+              className="grid grid-cols-2 gap-4"
+              onSubmit={(e) => e.preventDefault()}
+            >
               <div className="col-span-2 sm:col-span-1">
                 <Label>Department Name</Label>
                 <Input
@@ -281,6 +344,42 @@ export default function AllDepartmentsComponent() {
                   }
                 />
               </div>
+
+              {/* Employees Section */}
+              {!editMode && (
+                <div className="col-span-2 mt-6 pt-6 border-t">
+                  <h3 className="text-lg font-semibold mb-3">Employees</h3>
+                  {departmentEmployees.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No employees assigned to this department.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {departmentEmployees.map((de) => (
+                        <div
+                          key={de.id}
+                          className="flex justify-between items-center p-3 border rounded-lg"
+                        >
+                          <span className="font-medium">
+                            {de.employee.name}{" "}
+                            {de.employee.employee_id && `(${de.employee.employee_id})`}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openEmployeeDetails(de.employee);
+                            }}
+                          >
+                            Details
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="col-span-2 flex justify-between mt-4">
                 {!editMode ? (
@@ -331,24 +430,60 @@ export default function AllDepartmentsComponent() {
           <div className="space-y-4">
             <div>
               <Label>Select Employee</Label>
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose an employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableEmployees.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      No available employees
-                    </SelectItem>
-                  ) : (
-                    availableEmployees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id.toString()}>
-                        {emp.name} {emp.employee_id ? `(${emp.employee_id})` : ""}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              <Popover open={employeeSearchOpen} onOpenChange={setEmployeeSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={employeeSearchOpen}
+                    className="w-full justify-between"
+                  >
+                    {selectedEmployeeId
+                      ? availableEmployees.find((emp) => emp.id.toString() === selectedEmployeeId)?.name +
+                        (availableEmployees.find((emp) => emp.id.toString() === selectedEmployeeId)?.employee_id
+                          ? ` (${availableEmployees.find((emp) => emp.id.toString() === selectedEmployeeId)?.employee_id})`
+                          : "")
+                      : "Choose an employee..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search employee by name or ID..." />
+                    <CommandList>
+                      <CommandEmpty>No employee found.</CommandEmpty>
+                      <CommandGroup>
+                        {availableEmployees.length === 0 ? (
+                          <div className="py-6 text-center text-sm text-muted-foreground">
+                            No available employees
+                          </div>
+                        ) : (
+                          availableEmployees.map((emp) => (
+                            <CommandItem
+                              key={emp.id}
+                              value={`${emp.name} ${emp.employee_id || ""}`}
+                              onSelect={() => {
+                                setSelectedEmployeeId(emp.id.toString());
+                                setEmployeeSearchOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedEmployeeId === emp.id.toString()
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              {emp.name} {emp.employee_id ? `(${emp.employee_id})` : ""}
+                            </CommandItem>
+                          ))
+                        )}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <Button
@@ -386,6 +521,77 @@ export default function AllDepartmentsComponent() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Employee Details Modal */}
+      <Dialog open={employeeDetailsOpen} onOpenChange={setEmployeeDetailsOpen}>
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Employee Asset Assignments
+            </DialogTitle>
+            <DialogDescription>
+              {selectedEmployeeForDetails 
+                ? `Assets assigned to ${selectedEmployeeForDetails.name}${selectedEmployeeForDetails.employee_id ? ` (${selectedEmployeeForDetails.employee_id})` : ""}`
+                : "View employee asset assignments"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedEmployeeForDetails && (
+            <div className="space-y-4">
+              {loadingEmployeeAssignments ? (
+                <p className="text-sm text-muted-foreground">Loading assignments...</p>
+              ) : employeeAssignments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No assets assigned to this employee.</p>
+              ) : (
+                <div className="space-y-4">
+                  {employeeAssignments.map((assignment: any) => {
+                    const batch = assignment.batch;
+                    if (!batch) return null;
+                    
+                    const asset = batch.asset;
+                    const value = batch.purchase_price || 0;
+                    
+                    return (
+                      <div key={assignment.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="font-semibold text-base">
+                          {asset?.asset_name || "Unknown Asset"}
+                        </div>
+                        {asset?.asset_number && (
+                          <div className="text-sm text-muted-foreground">Asset #: {asset.asset_number}</div>
+                        )}
+                        
+                        <div className="mt-3 p-3 bg-gray-50 rounded">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">
+                                Batch: {batch.batch_name || `Batch #${batch.id}`}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                Date: {new Date(batch.purchase_date).toLocaleDateString()}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold text-orange-600">
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: 'SAR',
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }).format(value)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">Quantity: 1</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

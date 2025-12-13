@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { API_BASE } from "@/lib/api";
 import {
   Table,
@@ -28,7 +28,8 @@ import {
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 import type { Asset } from "@/components/AssetTable";
 import ViewBatchesModal from "@/components/ViewBatchesModal";
-import { Trash2 } from "lucide-react";
+import BarcodeScannerModal from "@/components/BarcodeScannerModal";
+import { Trash2, Search, QrCode } from "lucide-react";
 
 type AssetRow = Asset & {
   asset_value?: number | null;
@@ -40,18 +41,28 @@ type Pump = { id: number; name: string };
 type Category = { id: string; name: string };
 type Employee = { id: number; name: string; employee_id?: string | null };
 
+type AssignmentItem = {
+  batch_id: number;
+  serial_number?: string;
+  barcode?: string;
+};
+
 type AssignmentDraft = {
   id?: number;
   pump_id: number | null;
-  quantity: number | null;
-  batch_id: number | null; // Selected batch for this assignment
+  items: AssignmentItem[]; // Array of items with batch_id, serial_number, barcode
+};
+
+type EmployeeAssignmentItem = {
+  batch_id: number;
+  serial_number?: string;
+  barcode?: string;
 };
 
 type EmployeeAssignmentDraft = {
   id?: number;
   employee_id: number | null;
-  quantity: number | null;
-  batch_id: number | null;
+  items: EmployeeAssignmentItem[];
   assignment_date: string | null;
 };
 
@@ -60,19 +71,21 @@ const sanitizeAssignmentDrafts = (rows: AssignmentDraft[]) =>
     .filter(
       (row) =>
         row.pump_id != null &&
-        row.quantity != null &&
-        Number(row.quantity) > 0 &&
-        row.batch_id != null // Require batch selection
+        row.items.length > 0 &&
+        row.items.every(item => item.batch_id != null)
     )
     .map((row) => ({
       pump_id: row.pump_id!,
-      quantity: Number(row.quantity),
-      batch_id: row.batch_id!,
+      items: row.items.map(item => ({
+        batch_id: item.batch_id,
+        serial_number: item.serial_number?.trim() || undefined,
+        barcode: item.barcode?.trim() || undefined,
+      })),
       id: row.id,
     }));
 
 const draftTotalQuantity = (rows: AssignmentDraft[]) =>
-  rows.reduce((sum, row) => sum + (row.quantity ? Number(row.quantity) : 0), 0);
+  rows.reduce((sum, row) => sum + row.items.length, 0);
 
 const buildAssetPayload = (asset: AssetRow) => ({
   asset_name: asset.asset_name,
@@ -82,13 +95,29 @@ const buildAssetPayload = (asset: AssetRow) => ({
   remarks: asset.remarks,
   category_id: asset.category_id,
   asset_value: asset.asset_value,
-  assignments: sanitizeAssignmentDrafts(
-    (asset.assignments || []).map((assignment) => ({
+  // Convert existing assignments to new format with items
+  assignments: (asset.assignments || []).map((assignment: any) => {
+    const items: AssignmentItem[] = [];
+    // Extract items from batch_allocations
+    if (assignment.batch_allocations && Array.isArray(assignment.batch_allocations)) {
+      assignment.batch_allocations.forEach((alloc: any) => {
+        // If allocation has quantity > 1, create multiple items
+        const count = alloc.quantity || 1;
+        for (let i = 0; i < count; i++) {
+          items.push({
+            batch_id: alloc.batch_id,
+            serial_number: alloc.serial_number || undefined,
+            barcode: alloc.barcode || undefined,
+          });
+        }
+      });
+    }
+    return {
       id: assignment.id,
       pump_id: assignment.pump_id,
-      quantity: assignment.quantity,
-    }))
-  ),
+      items: items.length > 0 ? items : [],
+    };
+  }).filter((assignment: any) => assignment.items.length > 0),
 });
 
 export default function AllAssetsPage() {
@@ -98,6 +127,14 @@ export default function AllAssetsPage() {
   const [open, setOpen] = useState(false);
   const detailNumericFields = useMemo(() => new Set(["quantity", "asset_value"]), []);
   const detailReadOnlyFields = useMemo(() => new Set(["categoryName"]), []);
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [barcodeFilter, setBarcodeFilter] = useState<string | null>(null);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [isScanningMode, setIsScanningMode] = useState(false);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Assign modal state
   const [assignOpen, setAssignOpen] = useState(false);
@@ -105,6 +142,44 @@ export default function AllAssetsPage() {
   const [cats, setCats] = useState<Category[]>([]);
   const [assignCatId, setAssignCatId] = useState<string>("none");
   const [assignmentRows, setAssignmentRows] = useState<AssignmentDraft[]>([]);
+  
+  // Helper to add an item to an assignment row
+  const addItemToAssignment = (rowIndex: number, item: AssignmentItem) => {
+    setAssignmentRows((rows) => {
+      const newRows = [...rows];
+      newRows[rowIndex] = {
+        ...newRows[rowIndex],
+        items: [...(newRows[rowIndex].items || []), item],
+      };
+      return newRows;
+    });
+  };
+  
+  // Helper to remove an item from an assignment row
+  const removeItemFromAssignment = (rowIndex: number, itemIndex: number) => {
+    setAssignmentRows((rows) => {
+      const newRows = [...rows];
+      newRows[rowIndex] = {
+        ...newRows[rowIndex],
+        items: newRows[rowIndex].items.filter((_, idx) => idx !== itemIndex),
+      };
+      return newRows;
+    });
+  };
+  
+  // Helper to update an item in an assignment row
+  const updateItemInAssignment = (rowIndex: number, itemIndex: number, updates: Partial<AssignmentItem>) => {
+    setAssignmentRows((rows) => {
+      const newRows = [...rows];
+      newRows[rowIndex] = {
+        ...newRows[rowIndex],
+        items: newRows[rowIndex].items.map((item, idx) =>
+          idx === itemIndex ? { ...item, ...updates } : item
+        ),
+      };
+      return newRows;
+    });
+  };
   const [assignmentError, setAssignmentError] = useState<string>("");
   const [availableBatches, setAvailableBatches] = useState<any[]>([]);
   
@@ -118,7 +193,7 @@ export default function AllAssetsPage() {
   const [showViewBatches, setShowViewBatches] = useState(false);
   const [selectedAssetForBatches, setSelectedAssetForBatches] = useState<AssetRow | null>(null);
   const addAssignmentRow = () =>
-    setAssignmentRows((rows) => [...rows, { pump_id: null, quantity: null, batch_id: null }]);
+    setAssignmentRows((rows) => [...rows, { pump_id: null, items: [] }]);
   const removeAssignmentRow = (index: number) =>
     setAssignmentRows((rows) => rows.filter((_, idx) => idx !== index));
   const updateAssignmentRow = (
@@ -132,7 +207,7 @@ export default function AllAssetsPage() {
 
   // Employee assignment functions
   const addEmployeeAssignmentRow = () =>
-    setEmployeeAssignmentRows((rows) => [...rows, { employee_id: null, quantity: null, batch_id: null, assignment_date: new Date().toISOString().split("T")[0] }]);
+    setEmployeeAssignmentRows((rows) => [...rows, { employee_id: null, items: [], assignment_date: new Date().toISOString().split("T")[0] }]);
   const removeEmployeeAssignmentRow = (index: number) =>
     setEmployeeAssignmentRows((rows) => rows.filter((_, idx) => idx !== index));
   const updateEmployeeAssignmentRow = (
@@ -153,13 +228,50 @@ export default function AllAssetsPage() {
     return capacity - totalAssignedDraft;
   }, [selected, totalAssignedDraft]);
 
+  // Filter assets based on search query and barcode
+  const filteredAssets = useMemo(() => {
+    let filtered = assets;
+
+    // Filter by barcode first (if set)
+    if (barcodeFilter) {
+      filtered = filtered.filter((asset) => {
+        // Check if any assignment has a batch allocation with this barcode
+        return asset.assignments?.some((assignment: any) =>
+          assignment.batch_allocations?.some((alloc: any) =>
+            alloc.barcode?.toLowerCase() === barcodeFilter.toLowerCase()
+          )
+        ) || false;
+      });
+    }
+
+    // Filter by search query (asset name or serial number)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((asset) => {
+        // Check asset name
+        const nameMatch = asset.asset_name?.toLowerCase().includes(query);
+        
+        // Check serial numbers in batch allocations
+        const serialMatch = asset.assignments?.some((assignment: any) =>
+          assignment.batch_allocations?.some((alloc: any) =>
+            alloc.serial_number?.toLowerCase().includes(query)
+          )
+        ) || false;
+
+        return nameMatch || serialMatch;
+      });
+    }
+
+    return filtered;
+  }, [assets, searchQuery, barcodeFilter]);
+
   const totalInventoryValue = useMemo(
     () =>
-      assets.reduce(
+      filteredAssets.reduce(
         (sum, asset) => sum + (asset.totalValue ?? 0),
         0
       ),
-    [assets]
+    [filteredAssets]
   );
 
   // 🟢 1. Calculate how much of each batch was ALREADY used by this asset 
@@ -170,10 +282,11 @@ export default function AllAssetsPage() {
 
     selected.assignments.forEach((assign: any) => {
       // The backend returns batch_allocations inside assignments
+      // Each allocation is now one item (no quantity field)
       if (assign.batch_allocations && Array.isArray(assign.batch_allocations)) {
         assign.batch_allocations.forEach((alloc: any) => {
           const current = map.get(alloc.batch_id) || 0;
-          map.set(alloc.batch_id, current + Number(alloc.quantity));
+          map.set(alloc.batch_id, current + 1); // Each allocation = 1 item
         });
       }
     });
@@ -193,19 +306,24 @@ export default function AllAssetsPage() {
     const currentDraftUsage = new Map<number, number>();
 
     for (const row of assignmentRows) {
-      if (!row.batch_id) {
-        if (row.pump_id) {
-           error = "Please select a batch for all assignments.";
+      if (!row.pump_id) continue;
+      if (row.items.length === 0) {
+        error = "Please add at least one item for each assignment.";
            break;
         }
-        continue;
+      for (const item of row.items) {
+        if (!item.batch_id) {
+          error = "Please select a batch for all items.";
+          break;
       }
-      const current = currentDraftUsage.get(row.batch_id) || 0;
-      currentDraftUsage.set(row.batch_id, current + (Number(row.quantity) || 0));
+        const current = currentDraftUsage.get(item.batch_id) || 0;
+        currentDraftUsage.set(item.batch_id, current + 1);
+      }
+      if (error) break;
     }
     
     if (!error) {
-      for (const [batchId, requestedQty] of currentDraftUsage.entries()) {
+      for (const [batchId, requestedCount] of currentDraftUsage.entries()) {
         const batch = availableBatches.find((b) => b.id === batchId);
         
         if (batch) {
@@ -215,8 +333,8 @@ export default function AllAssetsPage() {
           // ✨ Allowable = What's in DB + What we are currently holding
           const trueLimit = dbRemaining + originalUsage;
 
-          if (requestedQty > trueLimit) {
-            error = `Quantity for batch (${new Date(batch.purchase_date).toLocaleDateString()}) exceeds limit. Available: ${trueLimit} (Requested: ${requestedQty})`;
+          if (requestedCount > trueLimit) {
+            error = `Quantity for batch (${new Date(batch.purchase_date).toLocaleDateString()}) exceeds limit. Available: ${trueLimit} (Requested: ${requestedCount})`;
             break;
           }
         }
@@ -241,6 +359,22 @@ export default function AllAssetsPage() {
     loadAssets();
   }, []);
 
+  // Focus hidden input when scanning mode is enabled
+  useEffect(() => {
+    if (isScanningMode && barcodeInputRef.current) {
+      // Small delay to ensure the input is ready
+      setTimeout(() => {
+        barcodeInputRef.current?.focus();
+      }, 100);
+    } else if (!isScanningMode && barcodeInputRef.current) {
+      barcodeInputRef.current.blur();
+      barcodeInputRef.current.value = "";
+      if (barcodeTimeoutRef.current) {
+        clearTimeout(barcodeTimeoutRef.current);
+      }
+    }
+  }, [isScanningMode]);
+
   // Open asset details
   const openDetails = (asset: Asset) => {
     setSelected(asset);
@@ -253,10 +387,11 @@ export default function AllAssetsPage() {
     if (!selected) return;
 
     const payload = buildAssetPayload(selected);
+    // Calculate total assignments from items array
     const totalAssignments = payload.assignments?.reduce(
-      (sum: number, row: { quantity: number }) => sum + row.quantity,
+      (sum: number, row: { items: AssignmentItem[] }) => sum + (row.items?.length || 0),
       0
-    );
+    ) || 0;
     const capacity = selected.quantity ?? 0;
     if (totalAssignments && totalAssignments > capacity) {
       alert("Assigned quantity cannot exceed the available quantity.");
@@ -291,22 +426,38 @@ export default function AllAssetsPage() {
     setOpen(false);
   };
 
-  // 🖨️ Print all assets (formatted like All Petrol Stations)
+  // 🖨️ Print filtered assets (shows only what's currently visible on screen)
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
+    // Calculate total value for filtered assets
+    const filteredTotalValue = filteredAssets.reduce(
+      (sum, asset) => sum + (asset.totalValue ?? 0),
+      0
+    );
+
+    // Determine if results are filtered
+    const isFiltered = searchQuery.trim().length > 0 || barcodeFilter !== null;
+    const filterInfo = isFiltered 
+      ? `<p style="text-align: center; color: #666; font-size: 12px; margin-bottom: 10px;">
+          ${searchQuery.trim() ? `Search: "${searchQuery}"` : ""}
+          ${barcodeFilter ? `Barcode: "${barcodeFilter}"` : ""}
+          (Showing ${filteredAssets.length} of ${assets.length} assets)
+         </p>`
+      : "";
+
     const html = `
       <html>
         <head>
-          <title>All Assets - Print</title>
+          <title>${isFiltered ? "Filtered Assets" : "All Assets"} - Print</title>
           <style>
             body {
               font-family: Arial, sans-serif;
               margin: 20px;
               background: #fff;
             }
-            h1 { text-align: center; margin-bottom: 20px; }
+            h1 { text-align: center; margin-bottom: 10px; }
             table {
               width: 100%;
               border-collapse: collapse;
@@ -326,9 +477,10 @@ export default function AllAssetsPage() {
           </style>
         </head>
         <body>
-          <h1>All Assets</h1>
+          <h1>${isFiltered ? "Filtered Assets" : "All Assets"}</h1>
+          ${filterInfo}
           <h2 style="margin-top: 8px; margin-bottom: 16px; text-align: center; color: #555; font-size: 14px;">
-            Total Inventory Value: ${totalInventoryValue.toLocaleString()}
+            Total Inventory Value: ${filteredTotalValue.toLocaleString()}
           </h2>
           <table>
             <thead>
@@ -346,32 +498,34 @@ export default function AllAssetsPage() {
               </tr>
             </thead>
             <tbody>
-              ${assets
-                .map(
-                  (a) => `
-                  <tr>
-                    <td>${a.id}</td>
-                    <td>${a.asset_name ?? ""}</td>
-                    <td>${a.asset_number ?? ""}</td>
-                    <td>${a.barcode ?? ""}</td>
-                    <td>${a.quantity ?? ""}</td>
-                    <td>${a.units ?? ""}</td>
-                    <td>${a.totalValue ?? 0}</td>
-                    <td>${a.remarks ?? ""}</td>
-                    <td>${a.categoryName ?? "-"}</td>
-                    <td>${
-                      a.assignments && a.assignments.length > 0
-                        ? a.assignments
-                            .map(
-                              (as) =>
-                                `${as.pump_name || `Station/Department #${as.pump_id}`}: ${as.quantity}`
-                            )
-                            .join("<br/>")
-                        : "-"
-                    }</td>
-                  </tr>`
-                )
-                .join("")}
+              ${filteredAssets.length === 0 
+                ? `<tr><td colspan="10" style="text-align: center; padding: 20px; color: #999;">No assets found</td></tr>`
+                : filteredAssets
+                    .map(
+                      (a) => `
+                      <tr>
+                        <td>${a.id}</td>
+                        <td>${a.asset_name ?? ""}</td>
+                        <td>${a.asset_number ?? ""}</td>
+                        <td>${a.barcode ?? ""}</td>
+                        <td>${a.quantity ?? ""}</td>
+                        <td>${a.units ?? ""}</td>
+                        <td>${a.totalValue ?? 0}</td>
+                        <td>${a.remarks ?? ""}</td>
+                        <td>${a.categoryName ?? "-"}</td>
+                        <td>${
+                          a.assignments && a.assignments.length > 0
+                            ? a.assignments
+                                .map(
+                                  (as) =>
+                                    `${as.pump_name || `Station/Department #${as.pump_id}`}: ${as.quantity}`
+                                )
+                                .join("<br/>")
+                            : "-"
+                        }</td>
+                      </tr>`
+                    )
+                    .join("")}
             </tbody>
           </table>
         </body>
@@ -404,26 +558,31 @@ export default function AllAssetsPage() {
     if (asset.assignments && asset.assignments.length > 0) {
       // For each assignment, get the batch_id from batch_allocations
       // If an assignment has multiple batch allocations, we'll use the first one
-      const assignmentRowsWithBatches = asset.assignments.map((assignment: any) => {
-        let batchId: number | null = null;
+      // Convert existing assignments to new format with items
+      const assignmentRowsWithItems = asset.assignments.map((assignment: any) => {
+        const items: AssignmentItem[] = [];
         
-        // Check if assignment has batch_allocations
+        // Extract items from batch_allocations
         if (assignment.batch_allocations && assignment.batch_allocations.length > 0) {
-          // Use the first batch allocation's batch_id
-          batchId = assignment.batch_allocations[0].batch_id;
+          assignment.batch_allocations.forEach((alloc: any) => {
+            items.push({
+              batch_id: alloc.batch_id,
+              serial_number: alloc.serial_number || undefined,
+              barcode: alloc.barcode || undefined,
+            });
+          });
         }
         
         return {
           id: assignment.id,
           pump_id: assignment.pump_id,
-          quantity: assignment.quantity,
-          batch_id: batchId,
+          items: items.length > 0 ? items : [],
         };
       });
       
-      setAssignmentRows(assignmentRowsWithBatches);
+      setAssignmentRows(assignmentRowsWithItems.length > 0 ? assignmentRowsWithItems : [{ pump_id: null, items: [] }]);
     } else {
-      setAssignmentRows([{ pump_id: null, quantity: null, batch_id: null }]);
+      setAssignmentRows([{ pump_id: null, items: [] }]);
     }
     
     setAssignmentError("");
@@ -464,7 +623,11 @@ export default function AllAssetsPage() {
       credentials: "include",
       body: JSON.stringify(payload),
     });
-    if (!res.ok) return alert("Failed to assign");
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ message: "Failed to assign" }));
+      alert(errorData.message || "Failed to assign");
+      return;
+    }
     const updated: AssetRow = await res.json();
 
     setAssets((prev) =>
@@ -479,19 +642,22 @@ export default function AllAssetsPage() {
     setSelected(asset);
     
     // Fetch batches for this asset
+    // Note: For employee assignments, we show ALL batches regardless of remaining_quantity
+    // because employee assignments are independent of station assignments
     let allBatches: any[] = [];
     try {
       const batchesRes = await fetch(`${API_BASE}/api/assets/${asset.id}/batches`, { credentials: "include" });
       const batchesData = await batchesRes.json();
       allBatches = Array.isArray(batchesData) ? batchesData : [];
-      setAvailableBatches(allBatches.filter((b: any) => b.remaining_quantity > 0));
+      // Don't filter by remaining_quantity - employee assignments are independent
+      setAvailableBatches(allBatches);
     } catch (e) {
       console.error("Failed to fetch batches", e);
       setAvailableBatches([]);
     }
     
     // Initialize with one empty row
-    setEmployeeAssignmentRows([{ employee_id: null, quantity: null, batch_id: null, assignment_date: new Date().toISOString().split("T")[0] }]);
+    setEmployeeAssignmentRows([{ employee_id: null, items: [], assignment_date: new Date().toISOString().split("T")[0] }]);
     setEmployeeAssignmentError("");
 
     // Fetch employees
@@ -508,6 +674,7 @@ export default function AllAssetsPage() {
   };
 
   // Validation for employee assignments
+  // Employee assignments are tracked separately from station assignments
   useEffect(() => {
     if (!employeeAssignOpen) {
       setEmployeeAssignmentError("");
@@ -516,26 +683,37 @@ export default function AllAssetsPage() {
     
     let error = "";
     
-    // Calculate requested usage per batch
+    // Calculate requested usage per batch for employees
     const currentDraftUsage = new Map<number, number>();
     for (const row of employeeAssignmentRows) {
-      if (!row.batch_id) {
-        if (row.employee_id) {
-          error = "Please select a batch for all assignments.";
+      if (!row.employee_id) continue;
+      if (row.items.length === 0) {
+        error = "Please add at least one item for each employee assignment.";
+        break;
+      }
+      for (const item of row.items) {
+        if (!item.batch_id) {
+          error = "Please select a batch for all items.";
           break;
         }
-        continue;
+        const current = currentDraftUsage.get(item.batch_id) || 0;
+        currentDraftUsage.set(item.batch_id, current + 1);
       }
-      const current = currentDraftUsage.get(row.batch_id) || 0;
-      currentDraftUsage.set(row.batch_id, current + (Number(row.quantity) || 0));
+      if (error) break;
     }
     
+    // Check employee-specific remaining quantity for each batch
     if (!error) {
-      for (const [batchId, requestedQty] of currentDraftUsage.entries()) {
+      for (const [batchId, requestedCount] of currentDraftUsage.entries()) {
         const batch = availableBatches.find((b) => b.id === batchId);
-        if (batch && requestedQty > batch.remaining_quantity) {
-          error = `Quantity for batch exceeds limit. Available: ${batch.remaining_quantity} (Requested: ${requestedQty})`;
-          break;
+        if (batch) {
+          // Use employee_remaining_quantity which is tracked separately from station assignments
+          const employeeRemaining = batch.employee_remaining_quantity ?? (batch.quantity - (batch.employee_assigned_count || 0));
+          
+          if (requestedCount > employeeRemaining) {
+            error = `Quantity for batch (${new Date(batch.purchase_date).toLocaleDateString()}) exceeds employee assignment limit. Available for employees: ${employeeRemaining} (Requested: ${requestedCount})`;
+            break;
+          }
         }
       }
     }
@@ -549,11 +727,11 @@ export default function AllAssetsPage() {
 
     // Save each employee assignment
     const validRows = employeeAssignmentRows.filter(
-      (row) => row.employee_id != null && row.batch_id != null && row.quantity != null && Number(row.quantity) > 0
+      (row) => row.employee_id != null && row.items.length > 0
     );
 
     if (validRows.length === 0) {
-      alert("Please add at least one employee assignment.");
+      alert("Please add at least one employee assignment with items.");
       return;
     }
 
@@ -564,14 +742,19 @@ export default function AllAssetsPage() {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            batch_id: row.batch_id,
-            quantity: Number(row.quantity),
+            items: row.items.map(item => ({
+              batch_id: item.batch_id,
+              serial_number: item.serial_number?.trim() || undefined,
+              barcode: item.barcode?.trim() || undefined,
+            })),
             assignment_date: row.assignment_date || new Date().toISOString(),
           }),
         });
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.message || "Failed to assign to employee");
+          const errorMessage = errorData.message || "Failed to assign to employee";
+          console.error("Employee assignment API error:", errorData);
+          throw new Error(errorMessage);
         }
       }
 
@@ -580,7 +763,9 @@ export default function AllAssetsPage() {
       setEmployeeAssignOpen(false);
       alert("✅ Assets assigned to employees successfully!");
     } catch (err: any) {
-      alert(err?.message || "Error assigning assets to employees");
+      const errorMessage = err?.message || "Error assigning assets to employees";
+      console.error("Employee assignment error:", err);
+      alert(errorMessage);
     }
   };
 
@@ -606,6 +791,145 @@ export default function AllAssetsPage() {
         </Button>
       </div>
 
+      {/* Search and Barcode Scanner */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Input
+            type="text"
+            placeholder="Search by asset name or serial number..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              // Clear barcode filter when searching
+              if (barcodeFilter) setBarcodeFilter(null);
+            }}
+            className="pl-10 bg-white/60 backdrop-blur-md"
+          />
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setIsScanningMode(true);
+            setShowBarcodeScanner(false); // Close camera modal if open
+            // Focus will be handled by useEffect
+          }}
+          className={`bg-white/60 backdrop-blur-md hover:bg-white/80 shrink-0 ${isScanningMode ? "ring-2 ring-primary ring-offset-2" : ""}`}
+        >
+          <QrCode className="w-4 h-4 mr-2" />
+          {isScanningMode ? "Scanning... (Click to Cancel)" : "Scan Barcode"}
+        </Button>
+        {isScanningMode && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsScanningMode(false);
+              if (barcodeInputRef.current) {
+                barcodeInputRef.current.value = "";
+              }
+              if (barcodeTimeoutRef.current) {
+                clearTimeout(barcodeTimeoutRef.current);
+              }
+            }}
+            className="bg-white/60 backdrop-blur-md hover:bg-white/80 shrink-0"
+          >
+            Cancel Scan
+          </Button>
+        )}
+        {barcodeFilter && (
+          <Button
+            variant="outline"
+            onClick={() => setBarcodeFilter(null)}
+            className="bg-white/60 backdrop-blur-md hover:bg-white/80 shrink-0"
+          >
+            Clear Barcode Filter
+          </Button>
+        )}
+      </div>
+
+      {isScanningMode && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            <strong>🔍 Scanning mode active:</strong> Scan a barcode with your barcode scanner. The page will automatically filter results.
+          </p>
+        </div>
+      )}
+
+      {barcodeFilter && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Filtered by barcode:</strong> {barcodeFilter}
+          </p>
+        </div>
+      )}
+
+      {/* Hidden input for barcode scanner (physical scanners send keyboard input) */}
+      <input
+        ref={barcodeInputRef}
+        type="text"
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          width: "1px",
+          height: "1px",
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+        onBlur={(e) => {
+          // Refocus if still in scanning mode (barcode scanner needs focus)
+          if (isScanningMode && barcodeInputRef.current) {
+            setTimeout(() => {
+              if (isScanningMode && barcodeInputRef.current) {
+                barcodeInputRef.current.focus();
+              }
+            }, 50);
+          }
+        }}
+        onChange={(e) => {
+          // Handle barcode input
+          const value = e.target.value;
+          
+          // Clear any existing timeout
+          if (barcodeTimeoutRef.current) {
+            clearTimeout(barcodeTimeoutRef.current);
+          }
+
+          // Barcode scanners typically send characters very quickly
+          // If no input for 150ms, assume scan is complete
+          barcodeTimeoutRef.current = setTimeout(() => {
+            const scannedBarcode = value.trim();
+            if (scannedBarcode.length > 0 && isScanningMode) {
+              setBarcodeFilter(scannedBarcode);
+              setSearchQuery(""); // Clear search when barcode is scanned
+              setIsScanningMode(false);
+              if (barcodeInputRef.current) {
+                barcodeInputRef.current.value = "";
+              }
+            }
+          }, 150);
+        }}
+        onKeyDown={(e) => {
+          // Handle Enter key (barcode scanners typically send Enter at the end)
+          if (e.key === "Enter") {
+            e.preventDefault();
+            const scannedBarcode = barcodeInputRef.current?.value.trim() || "";
+            if (scannedBarcode.length > 0) {
+              setBarcodeFilter(scannedBarcode);
+              setSearchQuery(""); // Clear search when barcode is scanned
+              setIsScanningMode(false);
+              if (barcodeInputRef.current) {
+                barcodeInputRef.current.value = "";
+              }
+              if (barcodeTimeoutRef.current) {
+                clearTimeout(barcodeTimeoutRef.current);
+              }
+            }
+          }
+        }}
+        placeholder=""
+        autoComplete="off"
+      />
+
       <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md -mx-3 sm:mx-0">
         <Table className="w-full min-w-[900px] sm:min-w-0">
           <TableHeader>
@@ -615,18 +939,44 @@ export default function AllAssetsPage() {
               <TableHead>Asset #</TableHead>
               <TableHead>Total Value</TableHead>
               <TableHead>Category</TableHead>
+              <TableHead>Quantity</TableHead>
               <TableHead>Station</TableHead>
               <TableHead>Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {assets.map((a) => (
+            {filteredAssets.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  {searchQuery || barcodeFilter
+                    ? "No assets found matching your search criteria."
+                    : "No assets available."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredAssets.map((a) => (
               <TableRow key={a.id} className="hover:bg-white/80 transition">
                 <TableCell>{a.id}</TableCell>
                 <TableCell>{a.asset_name}</TableCell>
                 <TableCell>{a.asset_number}</TableCell>
                 <TableCell>{a.totalValue ?? 0}</TableCell>
                 <TableCell>{a.categoryName ?? "-"}</TableCell>
+                <TableCell>
+                  {(() => {
+                    // Calculate total items from all batches
+                    const totalItems = (a.batches || []).reduce(
+                      (sum: number, batch: any) => sum + (batch.quantity || 0),
+                      0
+                    );
+                    // Get assigned items count
+                    const assignedItems = a.totalAssigned || 0;
+                    // Format as "assigned/total" with zero-padding
+                    const formatNumber = (num: number) => String(num).padStart(2, '0');
+                    return totalItems > 0 
+                      ? `${formatNumber(assignedItems)}/${formatNumber(totalItems)}`
+                      : "—";
+                  })()}
+                </TableCell>
                 <TableCell>
                   {a.assignments && a.assignments.length > 0 ? (
                     <div className="flex flex-col text-sm text-muted-foreground">
@@ -664,14 +1014,26 @@ export default function AllAssetsPage() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </div>
 
+      {/* Barcode Scanner Modal */}
+      <BarcodeScannerModal
+        open={showBarcodeScanner}
+        onClose={() => setShowBarcodeScanner(false)}
+        onScan={(barcode) => {
+          setBarcodeFilter(barcode);
+          setSearchQuery(""); // Clear search when barcode is scanned
+          setShowBarcodeScanner(false);
+        }}
+      />
+
       {/* DETAILS dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editMode ? "Edit Asset" : "Asset Details"}</DialogTitle>
             <DialogDescription>
@@ -686,8 +1048,6 @@ export default function AllAssetsPage() {
                   [
                     ["asset_name", "Asset Name"],
                     ["asset_number", "Asset #"],
-                    ["serial_number", "Serial #"],
-                    ["barcode", "Barcode"],
                     ["quantity", "Quantity"],
                     ["units", "Units"],
                     ["categoryName", "Category"],
@@ -720,14 +1080,6 @@ export default function AllAssetsPage() {
                     </div>
                   );
                 })}
-                <div className="col-span-1 sm:col-span-2">
-                  <Label>Remarks</Label>
-                  <div className="border rounded-md p-2 text-sm text-muted-foreground min-h-[44px]">
-                    {selected.remarks && selected.remarks.trim().length > 0
-                      ? selected.remarks
-                      : "—"}
-                  </div>
-                </div>
 
                 <div className="col-span-1 sm:col-span-2 flex flex-col-reverse sm:flex-row justify-between gap-2 mt-4">
                   {!editMode ? (
@@ -748,18 +1100,18 @@ export default function AllAssetsPage() {
               <div className="mt-6 pt-6 border-t">
                 <h3 className="text-lg font-semibold mb-3">Purchase Batches</h3>
                 {selected.batches && selected.batches.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-10 gap-2 text-xs font-semibold text-muted-foreground pb-2 border-b">
-                      <div>Name</div>
-                      <div>Date</div>
-                      <div>Serial #</div>
-                      <div>Barcode</div>
-                      <div>Price</div>
-                      <div>Quantity</div>
-                      <div>Remaining</div>
-                      <div>Remarks</div>
-                      <div>Value</div>
-                      <div className="text-right">Action</div>
+                  <div className="space-y-2 overflow-x-auto">
+                    <div className="grid grid-cols-12 gap-3 text-xs font-semibold text-muted-foreground pb-2 border-b min-w-[1000px]">
+                      <div className="col-span-2">Name</div>
+                      <div className="col-span-1">Date</div>
+                      <div className="col-span-1">Serial #</div>
+                      <div className="col-span-1">Barcode</div>
+                      <div className="col-span-1">Price</div>
+                      <div className="col-span-1">Quantity</div>
+                      <div className="col-span-1">Remaining</div>
+                      <div className="col-span-1">Remarks</div>
+                      <div className="col-span-2">Value</div>
+                      <div className="col-span-1 text-right">Action</div>
                     </div>
                     {selected.batches.map((batch: any) => {
                       const used = batch.quantity - batch.remaining_quantity;
@@ -767,22 +1119,22 @@ export default function AllAssetsPage() {
                       const remainingValue = batch.remaining_quantity * batch.purchase_price;
                       const canDelete = batch.remaining_quantity === batch.quantity; // Only if unused
                       return (
-                        <div key={batch.id} className="grid grid-cols-10 gap-2 text-sm py-2 border-b items-center">
-                          <div className="font-semibold">{batch.batch_name ?? "—"}</div>
-                          <div className="font-mono text-xs">{new Date(batch.purchase_date).toLocaleDateString()}</div>
-                          <div className="font-mono text-xs">{batch.serial_number ?? "—"}</div>
-                          <div className="font-mono text-xs">{batch.barcode ?? "—"}</div>
-                          <div className="font-semibold">{batch.purchase_price.toLocaleString()}</div>
-                          <div>{batch.quantity}</div>
-                          <div className={batch.remaining_quantity === 0 ? "text-muted-foreground" : ""}>{batch.remaining_quantity}</div>
-                          <div className="text-sm text-muted-foreground truncate">{batch.remarks ?? "—"}</div>
-                          <div>
+                        <div key={batch.id} className="grid grid-cols-12 gap-3 text-sm py-2 border-b items-center min-w-[1000px]">
+                          <div className="col-span-2 font-semibold break-words">{batch.batch_name || "—"}</div>
+                          <div className="col-span-1 font-mono text-xs">{new Date(batch.purchase_date).toLocaleDateString()}</div>
+                          <div className="col-span-1 font-mono text-xs break-words">{batch.serial_number ?? "—"}</div>
+                          <div className="col-span-1 font-mono text-xs break-words">{batch.barcode ?? "—"}</div>
+                          <div className="col-span-1 font-semibold">{batch.purchase_price.toLocaleString()}</div>
+                          <div className="col-span-1">{batch.quantity}</div>
+                          <div className={`col-span-1 ${batch.remaining_quantity === 0 ? "text-muted-foreground" : ""}`}>{batch.remaining_quantity}</div>
+                          <div className="col-span-1 text-sm text-muted-foreground break-words">{batch.remarks ?? "—"}</div>
+                          <div className="col-span-2">
                             <div className="font-semibold">{batchValue.toLocaleString()}</div>
                             <div className="text-xs text-muted-foreground">
                               Used: {used} · Remaining Value: {remainingValue.toLocaleString()}
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="col-span-1 text-right">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -869,17 +1221,8 @@ export default function AllAssetsPage() {
               )}
 
               {assignmentRows.map((row, index) => {
-                const selectedBatch = availableBatches.find((b) => b.id === row.batch_id);
-                // 🟢 3. UPDATED: UI shows correct limit including what is currently used
-                let maxQuantity = 0;
-                if (selectedBatch) {
-                  const dbRemaining = selectedBatch.remaining_quantity || 0;
-                  const originalUsage = originalBatchUsage.get(selectedBatch.id) || 0;
-                  maxQuantity = dbRemaining + originalUsage;
-                }
-
                 return (
-                  <div key={index} className="space-y-2 p-3 border rounded-lg">
+                  <div key={index} className="space-y-3 p-3 border rounded-lg">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <Label className="text-xs uppercase tracking-wide">Station/Department</Label>
@@ -904,14 +1247,57 @@ export default function AllAssetsPage() {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                          onClick={() => removeAssignmentRow(index)}
+                        >
+                          Remove Station
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs uppercase tracking-wide">Items ({row.items.length})</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addItemToAssignment(index, { batch_id: 0, serial_number: "", barcode: "" })}
+                        >
+                          + Add Item
+                        </Button>
+                      </div>
+                      
+                      {row.items.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-2">
+                          No items added. Click "Add Item" to assign assets.
+                        </p>
+                      )}
+                      
+                      {row.items.map((item, itemIndex) => {
+                        const selectedBatch = availableBatches.find((b) => b.id === item.batch_id);
+                        let maxAvailable = 0;
+                        if (selectedBatch) {
+                          const dbRemaining = selectedBatch.remaining_quantity || 0;
+                          const originalUsage = originalBatchUsage.get(selectedBatch.id) || 0;
+                          maxAvailable = dbRemaining + originalUsage;
+                        }
+                        
+                        return (
+                          <div key={itemIndex} className="p-2 border rounded bg-gray-50 space-y-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
-                        <Label className="text-xs uppercase tracking-wide">Batch</Label>
+                                <Label className="text-xs">Batch *</Label>
                         <Select
-                          value={row.batch_id?.toString() ?? "none"}
+                                  value={item.batch_id?.toString() ?? "none"}
                           onValueChange={(val) =>
-                            updateAssignmentRow(index, {
-                              batch_id: val === "none" ? null : Number(val),
-                              quantity: null, // Reset quantity when batch changes
+                                    updateItemInAssignment(index, itemIndex, {
+                                      batch_id: val === "none" ? 0 : Number(val),
                             })
                           }
                         >
@@ -927,27 +1313,9 @@ export default function AllAssetsPage() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <div className="sm:col-span-2">
-                        <Label className="text-xs uppercase tracking-wide">Quantity</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={maxQuantity}
-                          value={row.quantity ?? ""}
-                          onChange={(e) =>
-                            updateAssignmentRow(index, {
-                              quantity:
-                                e.target.value === "" ? null : Number(e.target.value),
-                            })
-                          }
-                          disabled={!row.batch_id}
-                        />
                         {selectedBatch && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            Max: {maxQuantity} available
+                                    {maxAvailable} available
                           </p>
                         )}
                       </div>
@@ -957,11 +1325,41 @@ export default function AllAssetsPage() {
                           variant="ghost"
                           size="sm"
                           className="text-destructive"
-                          onClick={() => removeAssignmentRow(index)}
+                                  onClick={() => removeItemFromAssignment(index, itemIndex)}
                         >
                           Remove
                         </Button>
                       </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-xs">Serial Number (optional)</Label>
+                                <Input
+                                  value={item.serial_number || ""}
+                                  onChange={(e) =>
+                                    updateItemInAssignment(index, itemIndex, {
+                                      serial_number: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Enter serial number"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Barcode (optional)</Label>
+                                <Input
+                                  value={item.barcode || ""}
+                                  onChange={(e) =>
+                                    updateItemInAssignment(index, itemIndex, {
+                                      barcode: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Enter barcode"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1044,11 +1442,8 @@ export default function AllAssetsPage() {
               )}
 
               {employeeAssignmentRows.map((row, index) => {
-                const selectedBatch = availableBatches.find((b) => b.id === row.batch_id);
-                const maxQuantity = selectedBatch?.remaining_quantity || 0;
-
                 return (
-                  <div key={index} className="space-y-2 p-3 border rounded-lg">
+                  <div key={index} className="space-y-3 p-3 border rounded-lg">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <Label className="text-xs uppercase tracking-wide">Employee</Label>
@@ -1073,66 +1468,19 @@ export default function AllAssetsPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div>
-                        <Label className="text-xs uppercase tracking-wide">Batch</Label>
-                        <Select
-                          value={row.batch_id?.toString() ?? "none"}
-                          onValueChange={(val) =>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <Label className="text-xs uppercase tracking-wide">Assignment Date</Label>
+                          <Input
+                            type="date"
+                            value={row.assignment_date ?? new Date().toISOString().split("T")[0]}
+                            onChange={(e) =>
                             updateEmployeeAssignmentRow(index, {
-                              batch_id: val === "none" ? null : Number(val),
-                              quantity: null, // Reset quantity when batch changes
-                            })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Batch" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Select Batch</SelectItem>
-                            {availableBatches.map((batch) => (
-                              <SelectItem key={batch.id} value={batch.id.toString()}>
-                                {batch.batch_name || "Unnamed"} - {new Date(batch.purchase_date).toLocaleDateString()} ({batch.remaining_quantity} available)
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <div>
-                        <Label className="text-xs uppercase tracking-wide">Quantity</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={maxQuantity}
-                          value={row.quantity ?? ""}
-                          onChange={(e) =>
-                            updateEmployeeAssignmentRow(index, {
-                              quantity:
-                                e.target.value === "" ? null : Number(e.target.value),
-                            })
-                          }
-                          disabled={!row.batch_id}
-                        />
-                        {selectedBatch && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Max: {maxQuantity} available
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label className="text-xs uppercase tracking-wide">Assignment Date</Label>
-                        <Input
-                          type="date"
-                          value={row.assignment_date ?? new Date().toISOString().split("T")[0]}
-                          onChange={(e) =>
-                            updateEmployeeAssignmentRow(index, {
-                              assignment_date: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="flex items-end">
+                                assignment_date: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
                         <Button
                           type="button"
                           variant="ghost"
@@ -1143,6 +1491,119 @@ export default function AllAssetsPage() {
                           Remove
                         </Button>
                       </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs uppercase tracking-wide">Items ({row.items.length})</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newItems = [...(row.items || []), { batch_id: 0, serial_number: "", barcode: "" }];
+                            updateEmployeeAssignmentRow(index, { items: newItems });
+                          }}
+                        >
+                          + Add Item
+                        </Button>
+                      </div>
+                      
+                      {row.items.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-2">
+                          No items added. Click "Add Item" to assign assets.
+                        </p>
+                      )}
+                      
+                      {row.items.map((item, itemIndex) => {
+                        const selectedBatch = availableBatches.find((b) => b.id === item.batch_id);
+                        const employeeRemaining = selectedBatch 
+                          ? (selectedBatch.employee_remaining_quantity ?? (selectedBatch.quantity - (selectedBatch.employee_assigned_count || 0)))
+                          : 0;
+                        
+                        return (
+                          <div key={itemIndex} className="p-2 border rounded bg-gray-50 space-y-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-xs">Batch *</Label>
+                                <Select
+                                  value={item.batch_id?.toString() ?? "none"}
+                                  onValueChange={(val) => {
+                                    const newItems = [...row.items];
+                                    newItems[itemIndex] = { ...item, batch_id: val === "none" ? 0 : Number(val) };
+                                    updateEmployeeAssignmentRow(index, { items: newItems });
+                                  }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Batch" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Select Batch</SelectItem>
+                            {availableBatches.map((batch) => {
+                              const empRemaining = batch.employee_remaining_quantity ?? (batch.quantity - (batch.employee_assigned_count || 0));
+                              const isDisabled = empRemaining <= 0;
+                              return (
+                                <SelectItem 
+                                  key={batch.id} 
+                                  value={batch.id.toString()}
+                                  disabled={isDisabled}
+                                >
+                                  {batch.batch_name || "Unnamed"} - {new Date(batch.purchase_date).toLocaleDateString()} ({empRemaining} available for employees{isDisabled ? " - FULL" : ""})
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        {selectedBatch && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                                    {employeeRemaining} available for employee assignment (Total: {selectedBatch.quantity}, Assigned to employees: {selectedBatch.employee_assigned_count || 0})
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive"
+                                  onClick={() => {
+                                    const newItems = row.items.filter((_, idx) => idx !== itemIndex);
+                                    updateEmployeeAssignmentRow(index, { items: newItems });
+                                  }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-xs">Serial Number (optional)</Label>
+                                <Input
+                                  value={item.serial_number || ""}
+                                  onChange={(e) => {
+                                    const newItems = [...row.items];
+                                    newItems[itemIndex] = { ...item, serial_number: e.target.value };
+                                    updateEmployeeAssignmentRow(index, { items: newItems });
+                                  }}
+                                  placeholder="Enter serial number"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs">Barcode (optional)</Label>
+                                <Input
+                                  value={item.barcode || ""}
+                                  onChange={(e) => {
+                                    const newItems = [...row.items];
+                                    newItems[itemIndex] = { ...item, barcode: e.target.value };
+                                    updateEmployeeAssignmentRow(index, { items: newItems });
+                                  }}
+                                  placeholder="Enter barcode"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );

@@ -108,8 +108,6 @@ export default function ViewBatchesModal({
     batchId: number,
     purchasePrice: number,
     purchaseDate: string,
-    serialNumber: string,
-    barcode: string,
     batchName: string
   ) => {
     try {
@@ -120,8 +118,6 @@ export default function ViewBatchesModal({
         body: JSON.stringify({
           purchase_price: purchasePrice,
           purchase_date: purchaseDate ? new Date(purchaseDate).toISOString() : undefined,
-          serial_number: serialNumber.trim(),
-          barcode: barcode.trim(),
           batch_name: batchName?.trim() || null,
         }),
       });
@@ -230,9 +226,7 @@ export default function ViewBatchesModal({
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Purchase Date</TableHead>
-                    <TableHead>Serial Number</TableHead>
                     <TableHead>Purchase Price</TableHead>
-                    <TableHead>Barcode</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead>Remaining</TableHead>
                     <TableHead>Used</TableHead>
@@ -255,14 +249,8 @@ export default function ViewBatchesModal({
                         <TableCell className="font-mono text-sm">
                           {formatDate(batch.purchase_date)}
                         </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {batch.serial_number ?? "—"}
-                        </TableCell>
                         <TableCell className="font-semibold">
                           {batch.purchase_price.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {batch.barcode ?? "—"}
                         </TableCell>
                         <TableCell>{batch.quantity}</TableCell>
                         <TableCell>{batch.remaining_quantity}</TableCell>
@@ -342,8 +330,8 @@ export default function ViewBatchesModal({
             setEditingBatch(null);
           }}
           batch={editingBatch}
-          onSave={(price, date, serial, barcode, batchName) =>
-            handleUpdateBatch(editingBatch.id, price, date, serial, barcode, batchName)
+          onSave={(price, date, batchName) =>
+            handleUpdateBatch(editingBatch.id, price, date, batchName)
           }
         />
       )}
@@ -391,7 +379,7 @@ interface EditBatchModalProps {
   open: boolean;
   onClose: () => void;
   batch: Batch;
-  onSave: (price: number, date: string, serial: string, barcode: string, batchName: string) => void;
+  onSave: (price: number, date: string, batchName: string) => void;
 }
 
 function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
@@ -399,16 +387,12 @@ function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
   const [date, setDate] = useState(
     new Date(batch.purchase_date).toISOString().split("T")[0]
   );
-  const [serial, setSerial] = useState(batch.serial_number ?? "");
-  const [barcode, setBarcode] = useState(batch.barcode ?? "");
   const [batchName, setBatchName] = useState(batch.batch_name ?? "");
 
   useEffect(() => {
     if (open) {
       setPrice(batch.purchase_price.toString());
       setDate(new Date(batch.purchase_date).toISOString().split("T")[0]);
-      setSerial(batch.serial_number ?? "");
-      setBarcode(batch.barcode ?? "");
       setBatchName(batch.batch_name ?? "");
     }
   }, [open, batch]);
@@ -420,15 +404,7 @@ function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
       alert("Please enter a valid price");
       return;
     }
-    if (!serial.trim()) {
-      alert("Serial number is required.");
-      return;
-    }
-    if (!barcode.trim()) {
-      alert("Barcode is required.");
-      return;
-    }
-    onSave(numPrice, date, serial.trim(), barcode.trim(), batchName.trim());
+    onSave(numPrice, date, batchName.trim());
   };
 
   return (
@@ -437,21 +413,14 @@ function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
         <DialogHeader>
           <DialogTitle>Edit Batch</DialogTitle>
           <DialogDescription>
-            Update the purchase price, date, serial number, or batch name for this batch. Note: Quantity cannot change.
+            Update the purchase price, date, or batch name for this batch. Note: Quantity cannot change.
+            Serial numbers and barcodes are tracked at the assignment level.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div>
             <Label>Batch Name (optional)</Label>
             <Input value={batchName} onChange={(e) => setBatchName(e.target.value)} placeholder="Enter a name for this batch" />
-          </div>
-          <div>
-            <Label>Serial Number *</Label>
-            <Input value={serial} onChange={(e) => setSerial(e.target.value)} required />
-          </div>
-          <div>
-            <Label>Barcode *</Label>
-            <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} required />
           </div>
           <div>
             <Label>Purchase Price (per unit) *</Label>

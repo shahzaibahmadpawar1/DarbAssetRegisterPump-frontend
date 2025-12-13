@@ -24,6 +24,30 @@ type Pump = {
   contact_number?: string | null;
   remarks?: string | null;
   assetCount: number;
+  totalAssetValue?: number;
+};
+
+type StationAsset = {
+  id: number;
+  asset_name: string;
+  asset_number: string;
+  assignments: Array<{
+    id: number;
+    pump_id: number;
+    batch_allocations: Array<{
+      batch_id: number;
+      batch?: {
+        id: number;
+        batch_name?: string;
+        purchase_price: number;
+        purchase_date: string;
+        asset?: {
+          id: number;
+          asset_name: string;
+        };
+      };
+    }>;
+  }>;
 };
 
 export default function AllStationsPage() {
@@ -32,6 +56,8 @@ export default function AllStationsPage() {
   const [editMode, setEditMode] = useState(false);
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"stations" | "departments">("stations");
+  const [stationAssets, setStationAssets] = useState<StationAsset[]>([]);
+  const [loadingAssets, setLoadingAssets] = useState(false);
 
   // 🟢 Fetch all stations
   useEffect(() => {
@@ -48,10 +74,23 @@ export default function AllStationsPage() {
   }, []);
 
   // 🟢 Open modal for details/edit
-  const openDetails = (pump: Pump) => {
+  const openDetails = async (pump: Pump) => {
     setSelected(pump);
     setEditMode(false);
     setOpen(true);
+    setLoadingAssets(true);
+    
+    // Fetch assets assigned to this station
+    try {
+      const res = await fetch(`${API_BASE}/api/assets?pump_id=${pump.id}`, { credentials: "include" });
+      const data = await res.json();
+      setStationAssets(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching station assets:", err);
+      setStationAssets([]);
+    } finally {
+      setLoadingAssets(false);
+    }
   };
 
   // 🟢 Save edits
@@ -179,7 +218,22 @@ export default function AllStationsPage() {
             className="bg-white/60 backdrop-blur-md hover:bg-white/80 transition hover:shadow-lg"
           >
             <CardHeader>
+              <div className="flex justify-between items-start">
               <CardTitle className="text-lg">{s.name}</CardTitle>
+                {s.totalAssetValue !== undefined && s.totalAssetValue > 0 && (
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">Total Value</div>
+                    <div className="text-lg font-bold text-orange-600">
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'SAR',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(s.totalAssetValue)}
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
               <div>
@@ -215,7 +269,7 @@ export default function AllStationsPage() {
 
       {/* 🧩 Modal for Details/Edit */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editMode ? "Edit Station" : "Station Details"}
@@ -260,6 +314,85 @@ export default function AllStationsPage() {
                   rows={3}
                 />
               </div>
+
+              {/* Assets Section */}
+              {!editMode && (
+                <div className="col-span-2 mt-6 pt-6 border-t">
+                  <h3 className="text-lg font-semibold mb-3">Assigned Assets</h3>
+                  {loadingAssets ? (
+                    <p className="text-sm text-muted-foreground">Loading assets...</p>
+                  ) : stationAssets.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No assets assigned to this station.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {stationAssets.map((asset) => {
+                        // Get assignments for this station
+                        const stationAssignments = asset.assignments?.filter(
+                          (a: any) => a.pump_id === selected?.id
+                        ) || [];
+                        
+                        if (stationAssignments.length === 0) return null;
+                        
+                        // Collect all batch allocations for this station
+                        const batchAllocations: any[] = [];
+                        stationAssignments.forEach((assignment: any) => {
+                          if (assignment.batch_allocations) {
+                            assignment.batch_allocations.forEach((alloc: any) => {
+                              batchAllocations.push(alloc);
+                            });
+                          }
+                        });
+                        
+                        return (
+                          <div key={asset.id} className="border rounded-lg p-4 space-y-2">
+                            <div className="font-semibold text-base">{asset.asset_name}</div>
+                            <div className="text-sm text-muted-foreground">Asset #: {asset.asset_number || "—"}</div>
+                            
+                            {batchAllocations.length > 0 ? (
+                              <div className="mt-3">
+                                <div className="text-sm font-semibold mb-2">Batch Details:</div>
+                                <div className="space-y-2">
+                                  {batchAllocations.map((alloc: any, idx: number) => {
+                                    const batch = alloc.batch;
+                                    if (!batch) return null;
+                                    
+                                    const value = batch.purchase_price || 0;
+                                    return (
+                                      <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                                        <div className="flex-1">
+                                          <div className="font-medium">
+                                            Batch: {batch.batch_name || `Batch #${batch.id}`}
+                                          </div>
+                                          <div className="text-xs text-muted-foreground">
+                                            Date: {new Date(batch.purchase_date).toLocaleDateString()}
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="font-semibold text-orange-600">
+                                            {new Intl.NumberFormat('en-US', {
+                                              style: 'currency',
+                                              currency: 'SAR',
+                                              minimumFractionDigits: 2,
+                                              maximumFractionDigits: 2,
+                                            }).format(value)}
+                                          </div>
+                                          <div className="text-xs text-muted-foreground">Qty: 1</div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground mt-2">No batch details available</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="col-span-2 flex justify-between mt-4">
                 {!editMode ? (
