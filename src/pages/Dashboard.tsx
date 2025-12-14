@@ -51,9 +51,13 @@ export default function Dashboard({
 
   const handleAddPump = async (data: PumpFormData) => {
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/pumps`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify(data),
       });
@@ -70,9 +74,13 @@ export default function Dashboard({
   const handleUpdatePump = async (data: PumpFormData) => {
     if (!editingPump) return;
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/pumps/${editingPump.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify(data),
       });
@@ -93,8 +101,12 @@ export default function Dashboard({
   const handleDeletePump = async () => {
     if (!deletingPumpId) return;
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/pumps/${deletingPumpId}`, {
         method: "DELETE",
+        headers: {
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to delete Statoion");

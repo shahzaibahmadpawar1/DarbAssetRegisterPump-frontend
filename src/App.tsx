@@ -14,6 +14,7 @@ import HomeDashboard from "./pages/HomeDashboard";
 import AssetsByCategoryReport from "./pages/reports/AssetsByCategory";
 import AllAssetsReport from "./pages/reports/AllAssets";
 import AllStationsReport from "./pages/reports/AllStations";
+import Accounts from "./pages/Accounts";
 import AssetForm, { type AssetFormData } from "./components/AssetForm";
 import PumpForm from "./components/PumpForm";
 import { API_BASE } from "./lib/api";
@@ -27,13 +28,15 @@ type View =
   | "employees"
   | "r-assets-by-cat"
   | "r-all-assets"
-  | "r-all-stations";
+  | "r-all-stations"
+  | "accounts";
 
 function App() {
   const [currentView, setCurrentView] = useState<View>("login");
   const [authUser, setAuthUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [selectedPumpId, setSelectedPumpId] = useState<number | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   const [assetFormOpen, setAssetFormOpen] = useState(false);
   const [pumpFormOpen, setPumpFormOpen] = useState(false);
@@ -68,6 +71,7 @@ function App() {
         if (data?.authenticated && data?.user) {
           // User is authenticated - restore their session
           setAuthUser(data.user);
+          setUserRole(data.user.role);
 
           // Determine the correct view based on current hash
           const hash = window.location.hash?.replace(/^#/, "") as View | "";
@@ -81,6 +85,7 @@ function App() {
             "r-assets-by-cat",
             "r-all-assets",
             "r-all-stations",
+            "accounts",
           ];
 
           // If hash is valid and not login, use it; otherwise default to home
@@ -122,6 +127,7 @@ function App() {
             "r-assets-by-cat",
             "r-all-assets",
             "r-all-stations",
+            "accounts",
           ];
           
           if (hash && validViews.includes(hash as View) && hash !== "login") {
@@ -150,7 +156,23 @@ function App() {
   const handleLogin = async (username: string, _password: string) => {
     try {
       setAuthLoading(true);
-      setAuthUser({ username });
+      // Fetch user role after login
+      try {
+        const storedToken = localStorage.getItem("auth_token");
+        const res = await fetch(`${API_BASE}/api/me`, {
+          credentials: "include",
+          headers: storedToken ? { "Authorization": `Bearer ${storedToken}` } : {},
+        });
+        const data = await res.json();
+        if (data?.authenticated && data?.user) {
+          setAuthUser(data.user);
+          setUserRole(data.user.role);
+        } else {
+          setAuthUser({ username });
+        }
+      } catch (err) {
+        setAuthUser({ username });
+      }
       setCurrentView("home");
       window.history.pushState({ view: "home" }, "Home", "#home");
     } finally {
@@ -171,6 +193,7 @@ function App() {
       // Clear localStorage token
       localStorage.removeItem("auth_token");
       setAuthUser(null);
+      setUserRole(null);
       setCurrentView("login");
       setSelectedPumpId(null);
       window.history.pushState({ view: "login" }, "Login", "#login");
@@ -208,9 +231,13 @@ function App() {
         units: data.units ?? null,
         category_id: data.category_id || null,
       };
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/assets`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify(payload),
       });
@@ -237,7 +264,14 @@ function App() {
           <LoginForm onLogin={handleLogin} />
         ) : (
           <>
-            <Header onLogout={handleLogout} />
+            <Header 
+              onLogout={handleLogout} 
+              currentView={currentView}
+              onNavigate={(view) => {
+                setCurrentView(view as View);
+                window.history.pushState({ view }, view, `#${view}`);
+              }}
+            />
 
             {currentView === "home" && (
               <HomeDashboard
@@ -245,6 +279,7 @@ function App() {
                 onGoAssets={() => setAssetFormOpen(true)}
                 onGoAddCategory={() => navigate("categories")}
                 onGoAddEmployee={() => navigate("employees")}
+                onGoEmployees={() => navigate("employees")}
                 onGoReportAssetsByCategory={() => navigate("r-assets-by-cat")}
                 onGoReportAllAssets={() => navigate("r-all-assets")}
                 onGoReportAllStations={() => navigate("r-all-stations")}
@@ -267,6 +302,7 @@ function App() {
             {currentView === "r-assets-by-cat" && <AssetsByCategoryReport />}
             {currentView === "r-all-assets" && <AllAssetsReport />}
             {currentView === "r-all-stations" && <AllStationsReport />}
+            {currentView === "accounts" && userRole === "admin" && <Accounts />}
 
             <AssetForm
               open={assetFormOpen}

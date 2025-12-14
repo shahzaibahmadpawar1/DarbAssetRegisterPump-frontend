@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,11 +49,13 @@ type Employee = {
 type Department = { id: number; name: string; manager: string };
 
 export default function Employees() {
+  const { isAdmin, canAssign } = useUserRole();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [name, setName] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [departmentId, setDepartmentId] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [initialLoad, setInitialLoad] = useState(true);
@@ -128,9 +131,13 @@ export default function Employees() {
     try {
       setLoading(true);
       setError("");
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/employees`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         body: JSON.stringify({ 
           name: name.trim(),
           employee_id: employeeId.trim() || null,
@@ -159,8 +166,12 @@ export default function Employees() {
     if (!confirm("Are you sure you want to delete this employee?")) return;
 
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/employees/${id}`, {
         method: "DELETE",
+        headers: {
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
       });
       if (!res.ok) throw new Error(await res.text());
@@ -211,11 +222,15 @@ export default function Employees() {
         payload.assignment_ids = Array.from(selectedAssignments);
       }
 
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(
         `${API_BASE}/api/employees/${sourceEmployeeId}/transfer-assets/${targetEmployeeId}`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+          },
           credentials: "include",
           body: JSON.stringify(payload),
         }
@@ -256,11 +271,15 @@ export default function Employees() {
 
     try {
       setLoading(true);
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(
         `${API_BASE}/api/employees/${transferEmployeeId}/transfer-department`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+          },
           credentials: "include",
           body: JSON.stringify({
             department_id: targetDepartmentId === "none" || targetDepartmentId === "" ? null : Number(targetDepartmentId),
@@ -296,11 +315,12 @@ export default function Employees() {
         <h1 className="text-2xl sm:text-3xl font-bold">Employees</h1>
       
       {/* Add Employee */}
-      <Card className="bg-white/60 backdrop-blur-md">
-        <CardHeader>
-          <CardTitle>Add Employee</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {isAdmin && (
+        <Card className="bg-white/60 backdrop-blur-md">
+          <CardHeader>
+            <CardTitle>Add Employee</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="employee-name">Employee Name <span className="text-destructive">*</span></Label>
             <Input
@@ -343,6 +363,7 @@ export default function Employees() {
           </Button>
         </CardContent>
       </Card>
+      )}
 
       {/* All Employees */}
       <Card className="bg-white/60 backdrop-blur-md">
@@ -350,6 +371,16 @@ export default function Employees() {
           <CardTitle>All Employees</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Search Input */}
+          <div className="mb-4">
+            <Input
+              placeholder="Search by employee name or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
+            />
+          </div>
+
           {loading && initialLoad ? (
             <p className="text-muted-foreground">Loading employees...</p>
           ) : error && initialLoad ? (
@@ -360,10 +391,24 @@ export default function Employees() {
               </Button>
             </div>
           ) : employees.length === 0 ? (
-            <p className="text-muted-foreground">No employees yet. Add one above to get started.</p>
-          ) : (
-            <ul className="divide-y">
-              {employees.map((e) => (
+            <p className="text-muted-foreground">No employees yet. {isAdmin && "Add one above to get started."}</p>
+          ) : (() => {
+            // Filter employees based on search query
+            const filteredEmployees = employees.filter((e) => {
+              if (!searchQuery.trim()) return true;
+              const query = searchQuery.toLowerCase().trim();
+              const nameMatch = e.name.toLowerCase().includes(query);
+              const idMatch = e.employee_id?.toLowerCase().includes(query);
+              return nameMatch || idMatch;
+            });
+
+            if (filteredEmployees.length === 0) {
+              return <p className="text-muted-foreground">No employees found matching "{searchQuery}"</p>;
+            }
+
+            return (
+              <ul className="divide-y">
+                {filteredEmployees.map((e) => (
                 <li
                   key={e.id}
                   className="flex flex-col gap-3 py-4"
@@ -383,31 +428,37 @@ export default function Employees() {
                       )}
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openTransferAssets(e.id)}
-                        className="w-full sm:w-auto shrink-0"
-                        disabled={!e.asset_assignments || e.asset_assignments.length === 0}
-                      >
-                        Transfer Assets
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openTransferDepartment(e.id)}
-                        className="w-full sm:w-auto shrink-0"
-                      >
-                        Transfer Dept
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteEmployee(e.id)}
-                        className="w-full sm:w-auto shrink-0"
-                      >
-                        Delete
-                      </Button>
+                      {canAssign && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openTransferAssets(e.id)}
+                            className="w-full sm:w-auto shrink-0"
+                            disabled={!e.asset_assignments || e.asset_assignments.length === 0}
+                          >
+                            Transfer Assets
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openTransferDepartment(e.id)}
+                            className="w-full sm:w-auto shrink-0"
+                          >
+                            Transfer Dept
+                          </Button>
+                        </>
+                      )}
+                      {isAdmin && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteEmployee(e.id)}
+                          className="w-full sm:w-auto shrink-0"
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </div>
                   {e.asset_assignments && e.asset_assignments.length > 0 && (
@@ -444,9 +495,10 @@ export default function Employees() {
                     </div>
                   )}
                 </li>
-              ))}
-            </ul>
-          )}
+                ))}
+              </ul>
+            );
+          })()}
         </CardContent>
       </Card>
 

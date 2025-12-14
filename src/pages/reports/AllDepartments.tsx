@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -57,6 +58,7 @@ type DepartmentEmployee = {
 };
 
 export default function AllDepartmentsComponent() {
+  const { canAssign, isAdmin } = useUserRole();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selected, setSelected] = useState<Department | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -151,9 +153,13 @@ export default function AllDepartmentsComponent() {
         name: selected.name,
         manager: selected.manager,
       };
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/departments/${selected.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify(payload),
       });
@@ -173,8 +179,12 @@ export default function AllDepartmentsComponent() {
     if (!confirm("Are you sure you want to delete this department?")) return;
 
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/departments/${id}`, {
         method: "DELETE",
+        headers: {
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to delete");
@@ -199,11 +209,15 @@ export default function AllDepartmentsComponent() {
   const assignEmployee = async () => {
     if (!selectedDepartmentForAssign || !selectedEmployeeId) return;
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(
         `${API_BASE}/api/departments/${selectedDepartmentForAssign.id}/employees`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+          },
           credentials: "include",
           body: JSON.stringify({ employee_id: Number(selectedEmployeeId) }),
         }
@@ -226,10 +240,14 @@ export default function AllDepartmentsComponent() {
     if (!selectedDepartmentForAssign) return;
 
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(
         `${API_BASE}/api/departments/${selectedDepartmentForAssign.id}/employees/${assignmentId}`,
         {
           method: "DELETE",
+          headers: {
+            ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+          },
           credentials: "include",
         }
       );
@@ -291,14 +309,16 @@ export default function AllDepartmentsComponent() {
                 >
                   Details
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openAssignEmployee(d)}
-                  className="flex-1"
-                >
-                  Assign Employee
-                </Button>
+                {canAssign && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openAssignEmployee(d)}
+                    className="flex-1"
+                  >
+                    Assign Employee
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -384,16 +404,20 @@ export default function AllDepartmentsComponent() {
               <div className="col-span-2 flex justify-between mt-4">
                 {!editMode ? (
                   <>
-                    <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
-                      ✏️ Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() => deleteDepartment(selected.id)}
-                    >
-                      🗑️ Delete
-                    </Button>
+                    {isAdmin && (
+                      <>
+                        <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
+                          ✏️ Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => deleteDepartment(selected.id)}
+                        >
+                          🗑️ Delete
+                        </Button>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>

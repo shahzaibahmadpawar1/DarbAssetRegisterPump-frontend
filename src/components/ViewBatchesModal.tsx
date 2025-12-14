@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,7 @@ export default function ViewBatchesModal({
   assetName,
   onRefresh,
 }: ViewBatchesModalProps) {
+  const { isAdmin } = useUserRole();
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -90,8 +92,12 @@ export default function ViewBatchesModal({
     }
 
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/assets/${assetId}/batches/${batchId}`, {
         method: "DELETE",
+        headers: {
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
       });
 
@@ -111,9 +117,13 @@ export default function ViewBatchesModal({
     batchName: string
   ) => {
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/assets/${assetId}/batches/${batchId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({
           purchase_price: purchasePrice,
@@ -174,14 +184,16 @@ export default function ViewBatchesModal({
                 View all purchase batches and their prices for this asset.
               </DialogDescription>
             </div>
-            <Button
-              onClick={() => setShowAddBatch(true)}
-              size="sm"
-              className="gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Batch
-            </Button>
+            {isAdmin && (
+              <Button
+                onClick={() => setShowAddBatch(true)}
+                size="sm"
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Batch
+              </Button>
+            )}
           </div>
         </DialogHeader>
 
@@ -232,7 +244,7 @@ export default function ViewBatchesModal({
                     <TableHead>Used</TableHead>
                     <TableHead>Batch Value</TableHead>
                     <TableHead>Remaining Value</TableHead>
-                    <TableHead>Actions</TableHead>
+                    {isAdmin && <TableHead>Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -264,30 +276,32 @@ export default function ViewBatchesModal({
                           {remainingValue.toLocaleString()}
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setEditingBatch(batch);
-                                setShowEditModal(true);
-                              }}
-                              title="Edit Batch"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            {batch.remaining_quantity === batch.quantity && (
+                          {isAdmin && (
+                            <div className="flex gap-1">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => setDeletingBatchId(batch.id)}
-                                title="Delete Batch"
-                                className="text-destructive"
+                                onClick={() => {
+                                  setEditingBatch(batch);
+                                  setShowEditModal(true);
+                                }}
+                                title="Edit Batch"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Pencil className="w-4 h-4" />
                               </Button>
-                            )}
-                          </div>
+                              {batch.remaining_quantity === batch.quantity && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeletingBatchId(batch.id)}
+                                  title="Delete Batch"
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { API_BASE } from "@/lib/api";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   Table,
   TableHead,
@@ -121,6 +122,7 @@ const buildAssetPayload = (asset: AssetRow) => ({
 });
 
 export default function AllAssetsPage() {
+  const { canAssign, isAdmin } = useUserRole();
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [selected, setSelected] = useState<AssetRow | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -398,9 +400,13 @@ export default function AllAssetsPage() {
       return;
     }
 
+    const storedToken = localStorage.getItem("auth_token");
     const res = await fetch(`${API_BASE}/api/assets/${selected.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+      },
       credentials: "include",
       body: JSON.stringify(payload),
     });
@@ -417,8 +423,12 @@ export default function AllAssetsPage() {
   // Delete asset (stay on same page)
   const deleteAsset = async (id: number) => {
     if (!confirm("Delete this asset?")) return;
+    const storedToken = localStorage.getItem("auth_token");
     const res = await fetch(`${API_BASE}/api/assets/${id}`, {
       method: "DELETE",
+      headers: {
+        ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+      },
       credentials: "include",
     });
     if (!res.ok) return alert("Failed to delete");
@@ -617,9 +627,13 @@ export default function AllAssetsPage() {
 
     if (assignmentError) return;
 
+    const storedToken = localStorage.getItem("auth_token");
     const res = await fetch(`${API_BASE}/api/assets/${selected.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+      },
       credentials: "include",
       body: JSON.stringify(payload),
     });
@@ -736,10 +750,14 @@ export default function AllAssetsPage() {
     }
 
     try {
+      const storedToken = localStorage.getItem("auth_token");
       for (const row of validRows) {
         const res = await fetch(`${API_BASE}/api/employees/${row.employee_id}/assignments`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+          },
           credentials: "include",
           body: JSON.stringify({
             items: row.items.map(item => ({
@@ -1009,8 +1027,12 @@ export default function AllAssetsPage() {
                       Batches
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openDetails(a)} className="text-xs">Details</Button>
-                    <Button variant="outline" size="sm" onClick={() => openAssign(a)} className="text-xs">Assign</Button>
-                    <Button variant="outline" size="sm" onClick={() => openEmployeeAssign(a)} className="text-xs">Assign to Employee</Button>
+                    {canAssign && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => openAssign(a)} className="text-xs">Assign</Button>
+                        <Button variant="outline" size="sm" onClick={() => openEmployeeAssign(a)} className="text-xs">Assign to Employee</Button>
+                      </>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -1084,8 +1106,12 @@ export default function AllAssetsPage() {
                 <div className="col-span-1 sm:col-span-2 flex flex-col-reverse sm:flex-row justify-between gap-2 mt-4">
                   {!editMode ? (
                     <>
-                      <Button type="button" variant="outline" onClick={() => setEditMode(true)} className="w-full sm:w-auto">✏️ Edit</Button>
-                      <Button type="button" variant="destructive" onClick={() => deleteAsset(selected.id)} className="w-full sm:w-auto">🗑️ Delete</Button>
+                      {isAdmin && (
+                        <>
+                          <Button type="button" variant="outline" onClick={() => setEditMode(true)} className="w-full sm:w-auto">✏️ Edit</Button>
+                          <Button type="button" variant="destructive" onClick={() => deleteAsset(selected.id)} className="w-full sm:w-auto">🗑️ Delete</Button>
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
@@ -1149,8 +1175,12 @@ export default function AllAssetsPage() {
                                 }
 
                                 try {
+                                  const storedToken = localStorage.getItem("auth_token");
                                   const res = await fetch(`${API_BASE}/api/assets/${selected.id}/batches/${batch.id}`, {
                                     method: "DELETE",
+                                    headers: {
+                                      ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+                                    },
                                     credentials: "include",
                                   });
 

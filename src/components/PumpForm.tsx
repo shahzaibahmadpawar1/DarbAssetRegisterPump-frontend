@@ -39,9 +39,13 @@ function DepartmentFormInline({
     }
     setLoading(true);
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/departments`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({
           name: formData.name.trim(),
@@ -160,9 +164,13 @@ export default function PumpForm({
       }
 
       // Otherwise, handle the submission internally (for adding)
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/pumps`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({
           name: formData.name,

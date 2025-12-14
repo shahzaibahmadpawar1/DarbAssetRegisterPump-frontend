@@ -50,9 +50,13 @@ export default function AddBatchModal({
   const onSubmit = async (data: BatchFormData) => {
     try {
       setLoading(true);
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/assets/${assetId}/batches`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({
           purchase_price: Number(data.purchase_price),

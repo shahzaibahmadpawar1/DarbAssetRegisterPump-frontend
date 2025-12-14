@@ -54,9 +54,13 @@ export default function DepartmentForm({
         : `${API_BASE}/api/departments`;
       const method = initialData ? "PUT" : "POST";
 
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({
           name: formData.name,

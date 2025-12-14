@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -50,8 +51,18 @@ type StationAsset = {
   }>;
 };
 
+type Department = {
+  id: number;
+  name: string;
+  manager: string;
+  employeeCount?: number;
+  totalAssetValue?: number;
+};
+
 export default function AllStationsPage() {
+  const { isAdmin } = useUserRole();
   const [stations, setStations] = useState<Pump[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [selected, setSelected] = useState<Pump | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [open, setOpen] = useState(false);
@@ -71,6 +82,20 @@ export default function AllStationsPage() {
       }
     }
     fetchStations();
+  }, []);
+
+  // 🟢 Fetch all departments
+  useEffect(() => {
+    async function fetchDepartments() {
+      try {
+        const res = await fetch(`${API_BASE}/api/departments`, { credentials: "include" });
+        const data = await res.json();
+        setDepartments(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Error fetching departments:", err);
+      }
+    }
+    fetchDepartments();
   }, []);
 
   // 🟢 Open modal for details/edit
@@ -104,9 +129,13 @@ export default function AllStationsPage() {
         contact_number: selected.contact_number ?? null,
         remarks: selected.remarks ?? null,
       };
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/pumps/${selected.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify(payload),
       });
@@ -126,8 +155,12 @@ export default function AllStationsPage() {
     if (!confirm("Are you sure you want to delete this station?")) return;
 
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/pumps/${id}`, {
         method: "DELETE",
+        headers: {
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to delete");
@@ -140,54 +173,105 @@ export default function AllStationsPage() {
     }
   };
 
-  // 🖨️ Print all stations
+  // 🖨️ Print stations or departments based on active tab
   const handlePrint = () => {
-    const html = `
-      <html>
-        <head>
-          <title>All Stations</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
-            h1 { text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-            th { background: #f0f0f0; }
-            tr:nth-child(even) { background: #fafafa; }
-          </style>
-        </head>
-        <body>
-          <h1>All Stations</h1>
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Location</th>
-                <th>Manager</th>
-                <th>Assets</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${stations
-                .map(
-                  (s) => `
-                  <tr>
-                    <td>${s.id}</td>
-                    <td>${s.name}</td>
-                    <td>${s.location}</td>
-                    <td>${s.manager}</td>
-                    <td>${s.assetCount}</td>
-                  </tr>`
-                )
-                .join("")}
-            </tbody>
-          </table>
-        </body>
-      </html>`;
-    const win = window.open("", "_blank");
-    win!.document.write(html);
-    win!.document.close();
-    win!.print();
+    if (activeTab === "departments") {
+      // Print departments
+      const html = `
+        <html>
+          <head>
+            <title>All Departments</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+              h1 { text-align: center; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+              th { background: #f0f0f0; }
+              tr:nth-child(even) { background: #fafafa; }
+            </style>
+          </head>
+          <body>
+            <h1>All Departments</h1>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Manager</th>
+                  <th>Employees</th>
+                  <th>Total Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${departments
+                  .map(
+                    (d) => `
+                    <tr>
+                      <td>${d.id}</td>
+                      <td>${d.name}</td>
+                      <td>${d.manager}</td>
+                      <td>${d.employeeCount || 0}</td>
+                      <td>${d.totalAssetValue ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(d.totalAssetValue) : '—'}</td>
+                    </tr>`
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </body>
+        </html>`;
+      const win = window.open("", "_blank");
+      win!.document.write(html);
+      win!.document.close();
+      win!.print();
+    } else {
+      // Print stations
+      const html = `
+        <html>
+          <head>
+            <title>All Stations</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+              h1 { text-align: center; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+              th { background: #f0f0f0; }
+              tr:nth-child(even) { background: #fafafa; }
+            </style>
+          </head>
+          <body>
+            <h1>All Stations</h1>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Location</th>
+                  <th>Manager</th>
+                  <th>Assets</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${stations
+                  .map(
+                    (s) => `
+                    <tr>
+                      <td>${s.id}</td>
+                      <td>${s.name}</td>
+                      <td>${s.location}</td>
+                      <td>${s.manager}</td>
+                      <td>${s.assetCount}</td>
+                    </tr>`
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          </body>
+        </html>`;
+      const win = window.open("", "_blank");
+      win!.document.write(html);
+      win!.document.close();
+      win!.print();
+    }
   };
 
   return (
@@ -397,16 +481,20 @@ export default function AllStationsPage() {
               <div className="col-span-2 flex justify-between mt-4">
                 {!editMode ? (
                   <>
-                    <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
-                      ✏️ Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      onClick={() => deleteStation(selected.id)}
-                    >
-                      🗑️ Delete
-                    </Button>
+                    {isAdmin && (
+                      <>
+                        <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
+                          ✏️ Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => deleteStation(selected.id)}
+                        >
+                          🗑️ Delete
+                        </Button>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>

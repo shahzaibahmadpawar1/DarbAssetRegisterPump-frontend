@@ -71,9 +71,13 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
       const payload = buildAssetPayload(data);
       if (!payload.asset_name || !payload.asset_number)
         throw new Error("Asset name and asset number are required.");
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/assets`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify(payload),
       });
@@ -90,9 +94,13 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
     if (!editingAsset) return;
     try {
       const payload = buildAssetPayload(data);
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/assets/${editingAsset.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify(payload),
       });
@@ -109,8 +117,12 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
   const handleDeleteAsset = async () => {
     if (!deletingAssetId) return;
     try {
+      const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/assets/${deletingAssetId}`, {
         method: "DELETE",
+        headers: {
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to delete asset");
