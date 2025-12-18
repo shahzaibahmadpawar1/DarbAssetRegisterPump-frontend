@@ -92,15 +92,15 @@ export default function Header({ onLogout, onMenuClick, showMenuButton = false, 
           )}
         </div>
         
-        <Button
-          variant="ghost"
-          onClick={onLogout}
-          className="gap-2"
-          data-testid="button-logout"
-        >
-          <LogOut className="w-4 h-4" />
-          <span className="hidden sm:inline">Logout</span>
-        </Button>
+      <Button
+        variant="ghost"
+        onClick={onLogout}
+        className="gap-2"
+        data-testid="button-logout"
+      >
+        <LogOut className="w-4 h-4" />
+        <span className="hidden sm:inline">Logout</span>
+      </Button>
       </div>
     </header>
   );

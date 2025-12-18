@@ -93,22 +93,22 @@ export default function Categories() {
 
       {/* Add Category */}
       {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Add Category</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col sm:flex-row gap-2">
-            <Input
-              placeholder="Category name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="flex-1"
-            />
-            <Button onClick={addCategory} disabled={loading} className="w-full sm:w-auto shrink-0">
-              {loading ? "Adding..." : "Add"}
-            </Button>
-          </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Add Category</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col sm:flex-row gap-2">
+          <Input
+            placeholder="Category name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="flex-1"
+          />
+          <Button onClick={addCategory} disabled={loading} className="w-full sm:w-auto shrink-0">
+            {loading ? "Adding..." : "Add"}
+          </Button>
+        </CardContent>
+      </Card>
       )}
 
       {/* All Categories */}
@@ -132,14 +132,14 @@ export default function Categories() {
                 >
                   <span className="break-words flex-1">{c.name}</span>
                   {isAdmin && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteCategory(c.id)}
-                      className="w-full sm:w-auto shrink-0"
-                    >
-                      Delete
-                    </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteCategory(c.id)}
+                    className="w-full sm:w-auto shrink-0"
+                  >
+                    Delete
+                  </Button>
                   )}
                 </li>
               ))}

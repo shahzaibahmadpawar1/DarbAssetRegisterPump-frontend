@@ -318,6 +318,10 @@ export default function AllAssetsPage() {
           error = "Please select a batch for all items.";
           break;
       }
+        if (!item.serial_number || !item.serial_number.trim()) {
+          error = "Serial number is required for all items.";
+          break;
+        }
         const current = currentDraftUsage.get(item.batch_id) || 0;
         currentDraftUsage.set(item.batch_id, current + 1);
       }
@@ -511,31 +515,31 @@ export default function AllAssetsPage() {
               ${filteredAssets.length === 0 
                 ? `<tr><td colspan="10" style="text-align: center; padding: 20px; color: #999;">No assets found</td></tr>`
                 : filteredAssets
-                    .map(
-                      (a) => `
-                      <tr>
-                        <td>${a.id}</td>
-                        <td>${a.asset_name ?? ""}</td>
-                        <td>${a.asset_number ?? ""}</td>
-                        <td>${a.barcode ?? ""}</td>
-                        <td>${a.quantity ?? ""}</td>
-                        <td>${a.units ?? ""}</td>
-                        <td>${a.totalValue ?? 0}</td>
-                        <td>${a.remarks ?? ""}</td>
-                        <td>${a.categoryName ?? "-"}</td>
-                        <td>${
-                          a.assignments && a.assignments.length > 0
-                            ? a.assignments
-                                .map(
-                                  (as) =>
-                                    `${as.pump_name || `Station/Department #${as.pump_id}`}: ${as.quantity}`
-                                )
-                                .join("<br/>")
-                            : "-"
-                        }</td>
-                      </tr>`
-                    )
-                    .join("")}
+                .map(
+                  (a) => `
+                  <tr>
+                    <td>${a.id}</td>
+                    <td>${a.asset_name ?? ""}</td>
+                    <td>${a.asset_number ?? ""}</td>
+                    <td>${a.barcode ?? ""}</td>
+                    <td>${a.quantity ?? ""}</td>
+                    <td>${a.units ?? ""}</td>
+                    <td>${a.totalValue ?? 0}</td>
+                    <td>${a.remarks ?? ""}</td>
+                    <td>${a.categoryName ?? "-"}</td>
+                    <td>${
+                      a.assignments && a.assignments.length > 0
+                        ? a.assignments
+                            .map(
+                              (as) =>
+                                `${as.pump_name || `Station/Department #${as.pump_id}`}: ${as.quantity}`
+                            )
+                            .join("<br/>")
+                        : "-"
+                    }</td>
+                  </tr>`
+                )
+                .join("")}
             </tbody>
           </table>
         </body>
@@ -688,7 +692,7 @@ export default function AllAssetsPage() {
   };
 
   // Validation for employee assignments
-  // Employee assignments are tracked separately from station assignments
+    // Employee assignments are tracked separately from station assignments
   useEffect(() => {
     if (!employeeAssignOpen) {
       setEmployeeAssignmentError("");
@@ -697,19 +701,23 @@ export default function AllAssetsPage() {
     
     let error = "";
     
-    // Calculate requested usage per batch for employees
+      // Calculate requested usage per batch for employees
     const currentDraftUsage = new Map<number, number>();
     for (const row of employeeAssignmentRows) {
       if (!row.employee_id) continue;
       if (row.items.length === 0) {
         error = "Please add at least one item for each employee assignment.";
-        break;
-      }
+          break;
+        }
       for (const item of row.items) {
         if (!item.batch_id) {
           error = "Please select a batch for all items.";
           break;
-        }
+      }
+          if (!item.serial_number || !item.serial_number.trim()) {
+            error = "Serial number is required for all items.";
+            break;
+          }
         const current = currentDraftUsage.get(item.batch_id) || 0;
         currentDraftUsage.set(item.batch_id, current + 1);
       }
@@ -726,7 +734,7 @@ export default function AllAssetsPage() {
           
           if (requestedCount > employeeRemaining) {
             error = `Quantity for batch (${new Date(batch.purchase_date).toLocaleDateString()}) exceeds employee assignment limit. Available for employees: ${employeeRemaining} (Requested: ${requestedCount})`;
-            break;
+          break;
           }
         }
       }
@@ -762,7 +770,7 @@ export default function AllAssetsPage() {
           body: JSON.stringify({
             items: row.items.map(item => ({
               batch_id: item.batch_id,
-              serial_number: item.serial_number?.trim() || undefined,
+              serial_number: item.serial_number?.trim() || "",
               barcode: item.barcode?.trim() || undefined,
             })),
             assignment_date: row.assignment_date || new Date().toISOString(),
@@ -1029,8 +1037,8 @@ export default function AllAssetsPage() {
                     <Button variant="outline" size="sm" onClick={() => openDetails(a)} className="text-xs">Details</Button>
                     {canAssign && (
                       <>
-                        <Button variant="outline" size="sm" onClick={() => openAssign(a)} className="text-xs">Assign</Button>
-                        <Button variant="outline" size="sm" onClick={() => openEmployeeAssign(a)} className="text-xs">Assign to Employee</Button>
+                    <Button variant="outline" size="sm" onClick={() => openAssign(a)} className="text-xs">Assign</Button>
+                    <Button variant="outline" size="sm" onClick={() => openEmployeeAssign(a)} className="text-xs">Assign to Employee</Button>
                       </>
                     )}
                   </div>
@@ -1107,9 +1115,9 @@ export default function AllAssetsPage() {
                   {!editMode ? (
                     <>
                       {isAdmin && (
-                        <>
-                          <Button type="button" variant="outline" onClick={() => setEditMode(true)} className="w-full sm:w-auto">✏️ Edit</Button>
-                          <Button type="button" variant="destructive" onClick={() => deleteAsset(selected.id)} className="w-full sm:w-auto">🗑️ Delete</Button>
+                    <>
+                      <Button type="button" variant="outline" onClick={() => setEditMode(true)} className="w-full sm:w-auto">✏️ Edit</Button>
+                      <Button type="button" variant="destructive" onClick={() => deleteAsset(selected.id)} className="w-full sm:w-auto">🗑️ Delete</Button>
                         </>
                       )}
                     </>
@@ -1363,7 +1371,7 @@ export default function AllAssetsPage() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <div>
-                                <Label className="text-xs">Serial Number (optional)</Label>
+                                <Label className="text-xs">Serial Number *</Label>
                                 <Input
                                   value={item.serial_number || ""}
                                   onChange={(e) =>
@@ -1372,6 +1380,7 @@ export default function AllAssetsPage() {
                                     })
                                   }
                                   placeholder="Enter serial number"
+                                  required
                                 />
                               </div>
                               <div>
@@ -1579,7 +1588,7 @@ export default function AllAssetsPage() {
                                   disabled={isDisabled}
                                 >
                                   {batch.batch_name || "Unnamed"} - {new Date(batch.purchase_date).toLocaleDateString()} ({empRemaining} available for employees{isDisabled ? " - FULL" : ""})
-                                </SelectItem>
+                              </SelectItem>
                               );
                             })}
                           </SelectContent>
@@ -1607,7 +1616,7 @@ export default function AllAssetsPage() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <div>
-                                <Label className="text-xs">Serial Number (optional)</Label>
+                                <Label className="text-xs">Serial Number *</Label>
                                 <Input
                                   value={item.serial_number || ""}
                                   onChange={(e) => {
@@ -1616,6 +1625,7 @@ export default function AllAssetsPage() {
                                     updateEmployeeAssignmentRow(index, { items: newItems });
                                   }}
                                   placeholder="Enter serial number"
+                                  required
                                 />
                               </div>
                               <div>

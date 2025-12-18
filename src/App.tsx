@@ -171,7 +171,7 @@ function App() {
           setAuthUser({ username });
         }
       } catch (err) {
-        setAuthUser({ username });
+      setAuthUser({ username });
       }
       setCurrentView("home");
       window.history.pushState({ view: "home" }, "Home", "#home");

@@ -22,28 +22,28 @@ export default function HomeDashboard(props: HomeDashboardProps) {
       label: "Add Station/Department",
       icon: <Factory className="w-5 h-5" />,
       onClick: props.onGoPumps,
-      buttonText: "Add",
+      buttonText: "Add", 
       requiresAdmin: true,
     },
     {
       label: "Add Asset",
       icon: <PlusCircle className="w-5 h-5" />,
       onClick: props.onGoAssets,
-      buttonText: "Add",
+      buttonText: "Add", 
       requiresAdmin: true,
     },
     {
       label: "Add Category",
       icon: <FolderPlus className="w-5 h-5" />,
       onClick: props.onGoAddCategory,
-      buttonText: "Add",
+      buttonText: "Add", 
       requiresAdmin: true,
     },
     {
       label: "Add Employee",
       icon: <UserPlus className="w-5 h-5" />,
       onClick: props.onGoAddEmployee,
-      buttonText: "Add",
+      buttonText: "Add", 
       requiresAdmin: true,
     },
     {
@@ -87,19 +87,19 @@ export default function HomeDashboard(props: HomeDashboardProps) {
             return null;
           }
           return (
-            <Card key={it.label} className="hover:shadow-md transition bg-gray-100">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  {it.icon}
-                  {it.label}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Button onClick={it.onClick} className="w-full bg-orange-500 hover:bg-orange-600">
-                  {it.buttonText}
-                </Button>
-              </CardContent>
-            </Card>
+          <Card key={it.label} className="hover:shadow-md transition bg-gray-100">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                {it.icon}
+                {it.label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={it.onClick} className="w-full bg-orange-500 hover:bg-orange-600">
+                {it.buttonText}
+              </Button>
+            </CardContent>
+          </Card>
           );
         })}
       </div>

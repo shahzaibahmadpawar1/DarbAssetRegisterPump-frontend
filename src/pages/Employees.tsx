@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
+import { Printer } from "lucide-react";
 
 type AssetAssignment = {
   asset_id: number;
@@ -463,8 +464,86 @@ export default function Employees() {
                   </div>
                   {e.asset_assignments && e.asset_assignments.length > 0 && (
                     <div className="mt-1 space-y-2 pl-2 border-l-2 border-orange-300 bg-orange-50/50 rounded-r p-2">
-                      <div className="text-xs font-semibold text-orange-700 uppercase tracking-wide">
-                        Assigned Assets:
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="text-xs font-semibold text-orange-700 uppercase tracking-wide">
+                          Assigned Assets:
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const html = `
+                              <html>
+                                <head>
+                                  <title>Employee Assets - ${e.name}</title>
+                                  <style>
+                                    body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+                                    h1 { text-align: center; color: #333; }
+                                    .employee-info { background: #fff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+                                    .employee-info p { margin: 5px 0; }
+                                    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; }
+                                    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                                    th { background: #f0f0f0; font-weight: bold; }
+                                    tr:nth-child(even) { background: #fafafa; }
+                                  </style>
+                                </head>
+                                <body>
+                                  <h1>Employee Assets Report</h1>
+                                  <div class="employee-info">
+                                    <p><strong>Employee Name:</strong> ${e.name}</p>
+                                    <p><strong>Employee ID:</strong> ${e.employee_id || "—"}</p>
+                                    <p><strong>Department:</strong> ${e.department_name || "—"}</p>
+                                    <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
+                                  </div>
+                                  <h2>Assigned Assets</h2>
+                                  <table>
+                                    <thead>
+                                      <tr>
+                                        <th>Asset Name</th>
+                                        <th>Asset Number</th>
+                                        <th>Batch Name</th>
+                                        <th>Purchase Date</th>
+                                        <th>Serial Number</th>
+                                        <th>Assignment Date</th>
+                                        <th>Value</th>
+                                        <th>Quantity</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      ${e.asset_assignments.map((asset: any) => 
+                                        asset.batches.flatMap((batch: any) => 
+                                          (batch.items && batch.items.length > 0 ? batch.items : [{ id: batch.batch_id, serial_number: null, assignment_date: null, purchase_price: null }]).map((item: any) => {
+                                            // purchase_price is in the item (assignment) object, not batch
+                                            const value = item.purchase_price || 0;
+                                            return `
+                                            <tr>
+                                              <td>${asset.asset_name}</td>
+                                              <td>${asset.asset_number || "—"}</td>
+                                              <td>${batch.batch_name || `Batch #${batch.batch_id}`}</td>
+                                              <td>${batch.purchase_date ? new Date(batch.purchase_date).toLocaleDateString() : "—"}</td>
+                                              <td>${item.serial_number || "—"}</td>
+                                              <td>${item.assignment_date ? new Date(item.assignment_date).toLocaleDateString() : "—"}</td>
+                                              <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(value)}</td>
+                                              <td>1</td>
+                                            </tr>
+                                          `;
+                                          })
+                                        ).join("")
+                                      ).join("")}
+                                    </tbody>
+                                  </table>
+                                </body>
+                              </html>`;
+                            const win = window.open("", "_blank");
+                            win!.document.write(html);
+                            win!.document.close();
+                            win!.print();
+                          }}
+                          className="h-6 px-2 text-xs gap-1"
+                        >
+                          <Printer className="w-3 h-3" />
+                          Print
+                        </Button>
                       </div>
                       <div className="space-y-2">
                         {e.asset_assignments.map((asset) => (
@@ -472,19 +551,36 @@ export default function Employees() {
                             <div className="font-semibold text-foreground mb-1">
                               {asset.asset_name} <span className="text-muted-foreground font-normal">({asset.asset_number})</span>
                             </div>
-                            <div className="ml-2 space-y-1">
+                            <div className="ml-2 space-y-2">
                               {asset.batches.map((batch) => (
-                                <div key={batch.batch_id} className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 font-medium">
-                                    Batch: {batch.batch_name || `#${batch.batch_id}`}
-                                  </span>
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-medium">
-                                    Qty: {batch.quantity}
-                                  </span>
-                                  {batch.purchase_date && (
-                                    <span className="text-muted-foreground">
-                                      {new Date(batch.purchase_date).toLocaleDateString()}
+                                <div key={batch.batch_id} className="text-xs space-y-1">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 font-medium">
+                                      Batch: {batch.batch_name || `#${batch.batch_id}`}
                                     </span>
+                                    {batch.purchase_date && (
+                                      <span className="text-muted-foreground">
+                                        Purchase: {new Date(batch.purchase_date).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {batch.items && batch.items.length > 0 && (
+                                    <div className="ml-2 space-y-1">
+                                      {batch.items.map((item: any, idx: number) => (
+                                        <div key={item.id || idx} className="flex flex-wrap items-center gap-1.5">
+                                          {item.serial_number && (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-medium">
+                                              Serial #: {item.serial_number}
+                                            </span>
+                                          )}
+                                          {item.assignment_date && (
+                                            <span className="text-muted-foreground">
+                                              Assigned: {new Date(item.assignment_date).toLocaleDateString()}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
                               ))}

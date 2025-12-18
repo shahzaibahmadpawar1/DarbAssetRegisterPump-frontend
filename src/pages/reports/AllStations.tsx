@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 import AllDepartmentsComponent from "./AllDepartments";
+import { Printer } from "lucide-react";
 
 type Pump = {
   id: number;
@@ -104,7 +105,7 @@ export default function AllStationsPage() {
     setEditMode(false);
     setOpen(true);
     setLoadingAssets(true);
-    
+
     // Fetch assets assigned to this station
     try {
       const res = await fetch(`${API_BASE}/api/assets?pump_id=${pump.id}`, { credentials: "include" });
@@ -132,7 +133,7 @@ export default function AllStationsPage() {
       const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/pumps/${selected.id}`, {
         method: "PUT",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
         },
@@ -204,8 +205,8 @@ export default function AllStationsPage() {
               </thead>
               <tbody>
                 ${departments
-                  .map(
-                    (d) => `
+          .map(
+            (d) => `
                     <tr>
                       <td>${d.id}</td>
                       <td>${d.name}</td>
@@ -213,8 +214,8 @@ export default function AllStationsPage() {
                       <td>${d.employeeCount || 0}</td>
                       <td>${d.totalAssetValue ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(d.totalAssetValue) : '—'}</td>
                     </tr>`
-                  )
-                  .join("")}
+          )
+          .join("")}
               </tbody>
             </table>
           </body>
@@ -226,47 +227,47 @@ export default function AllStationsPage() {
     } else {
       // Print stations
       const html = `
-        <html>
-          <head>
-            <title>All Stations</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
-              h1 { text-align: center; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-              th { background: #f0f0f0; }
-              tr:nth-child(even) { background: #fafafa; }
-            </style>
-          </head>
-          <body>
-            <h1>All Stations</h1>
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Location</th>
-                  <th>Manager</th>
-                  <th>Assets</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${stations
-                  .map(
-                    (s) => `
-                    <tr>
-                      <td>${s.id}</td>
-                      <td>${s.name}</td>
-                      <td>${s.location}</td>
-                      <td>${s.manager}</td>
-                      <td>${s.assetCount}</td>
-                    </tr>`
-                  )
-                  .join("")}
-              </tbody>
-            </table>
-          </body>
-        </html>`;
+      <html>
+        <head>
+          <title>All Stations</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+            h1 { text-align: center; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th { background: #f0f0f0; }
+            tr:nth-child(even) { background: #fafafa; }
+          </style>
+        </head>
+        <body>
+          <h1>All Stations</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Location</th>
+                <th>Manager</th>
+                <th>Assets</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${stations
+          .map(
+            (s) => `
+                  <tr>
+                    <td>${s.id}</td>
+                    <td>${s.name}</td>
+                    <td>${s.location}</td>
+                    <td>${s.manager}</td>
+                    <td>${s.assetCount}</td>
+                  </tr>`
+          )
+          .join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>`;
       const win = window.open("", "_blank");
       win!.document.write(html);
       win!.document.close();
@@ -279,8 +280,8 @@ export default function AllStationsPage() {
       <div className="flex justify-between items-center mb-6">
         <BackToDashboardButton />
         <h1 className="text-3xl font-bold">All Stations/Departments</h1>
-        <Button 
-          onClick={handlePrint} 
+        <Button
+          onClick={handlePrint}
           variant="outline"
           className="bg-white/60 backdrop-blur-md hover:bg-white/80"
         >
@@ -296,53 +297,53 @@ export default function AllStationsPage() {
 
         <TabsContent value="stations">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {stations.map((s) => (
-          <Card
-            key={s.id}
-            className="bg-white/60 backdrop-blur-md hover:bg-white/80 transition hover:shadow-lg"
-          >
-            <CardHeader>
-              <div className="flex justify-between items-start">
-              <CardTitle className="text-lg">{s.name}</CardTitle>
-                {s.totalAssetValue !== undefined && s.totalAssetValue > 0 && (
-                  <div className="text-right">
-                    <div className="text-xs text-muted-foreground">Total Value</div>
-                    <div className="text-lg font-bold text-orange-600">
-                      {new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'SAR',
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }).format(s.totalAssetValue)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div>
-                <span className="text-sm font-semibold">Location: </span>
-                <span className="text-sm text-muted-foreground">{s.location}</span>
-              </div>
-              <div>
-                <span className="text-sm font-semibold">Manager: </span>
-                <span className="text-sm text-muted-foreground">{s.manager}</span>
-              </div>
-              <div>
-                <span className="text-sm font-semibold">Assets: </span>
-                <span className="text-sm text-muted-foreground">{s.assetCount}</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openDetails(s)}
-                className="w-full mt-4"
+            {stations.map((s) => (
+              <Card
+                key={s.id}
+                className="bg-white/60 backdrop-blur-md hover:bg-white/80 transition hover:shadow-lg"
               >
-                Details
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <CardTitle className="text-lg">{s.name}</CardTitle>
+                    {s.totalAssetValue !== undefined && s.totalAssetValue > 0 && (
+                      <div className="text-right">
+                        <div className="text-xs text-muted-foreground">Total Value</div>
+                        <div className="text-lg font-bold text-orange-600">
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: 'SAR',
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }).format(s.totalAssetValue)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div>
+                    <span className="text-sm font-semibold">Location: </span>
+                    <span className="text-sm text-muted-foreground">{s.location}</span>
+                  </div>
+                  <div>
+                    <span className="text-sm font-semibold">Manager: </span>
+                    <span className="text-sm text-muted-foreground">{s.manager}</span>
+                  </div>
+                  <div>
+                    <span className="text-sm font-semibold">Assets: </span>
+                    <span className="text-sm text-muted-foreground">{s.assetCount}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openDetails(s)}
+                    className="w-full mt-4"
+                  >
+                    Details
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </TabsContent>
 
@@ -355,14 +356,128 @@ export default function AllStationsPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editMode ? "Edit Station" : "Station Details"}
-            </DialogTitle>
-            <DialogDescription>
-              {editMode
-                ? "Update station information below."
-                : "View station details."}
-            </DialogDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <DialogTitle>
+                  {editMode ? "Edit Station" : "Station Details"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editMode
+                    ? "Update station information below."
+                    : "View station details."}
+                </DialogDescription>
+              </div>
+              {!editMode && selected && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const html = `
+                      <html>
+                        <head>
+                          <title>Station Assets - ${selected.name}</title>
+                          <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+                            h1 { text-align: center; color: #333; }
+                            h2 { color: #666; margin-top: 20px; }
+                            .station-info { background: #fff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+                            .station-info p { margin: 5px 0; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; }
+                            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                            th { background: #f0f0f0; font-weight: bold; }
+                            tr:nth-child(even) { background: #fafafa; }
+                            .asset-section { margin-bottom: 30px; }
+                            .asset-name { font-weight: bold; font-size: 16px; color: #333; }
+                            .asset-number { color: #666; font-size: 14px; }
+                          </style>
+                        </head>
+                        <body>
+                          <h1>Station Assets Report</h1>
+                          <div class="station-info">
+                            <p><strong>Station Name:</strong> ${selected.name}</p>
+                            <p><strong>Location:</strong> ${selected.location}</p>
+                            <p><strong>Manager:</strong> ${selected.manager}</p>
+                            <p><strong>Contact Number:</strong> ${selected.contact_number || "—"}</p>
+                            <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
+                          </div>
+                          <h2>Assigned Assets</h2>
+                          ${stationAssets.length === 0
+                        ? "<p>No assets assigned to this station.</p>"
+                        : (() => {
+                          const allRows: any[] = [];
+                          stationAssets.forEach((asset: any) => {
+                            const stationAssignments = asset.assignments?.filter(
+                              (a: any) => a.pump_id === selected.id
+                            ) || [];
+
+                            stationAssignments.forEach((assignment: any) => {
+                              if (assignment.batch_allocations) {
+                                assignment.batch_allocations.forEach((alloc: any) => {
+                                  const batch = alloc.batch;
+                                  if (batch) {
+                                    allRows.push({
+                                      asset_name: asset.asset_name,
+                                      asset_number: asset.asset_number || "—",
+                                      batch_name: batch.batch_name || `Batch #${batch.id}`,
+                                      purchase_date: batch.purchase_date,
+                                      serial_number: alloc.serial_number || "—",
+                                      assignment_date: assignment.assignment_date || alloc.assignment_date,
+                                      value: batch.purchase_price || 0
+                                    });
+                                  }
+                                });
+                              }
+                            });
+                          });
+
+                          if (allRows.length === 0) return "<p>No assets assigned to this station.</p>";
+
+                          return `
+                                  <table>
+                                    <thead>
+                                      <tr>
+                                        <th>Asset Name</th>
+                                        <th>Asset Number</th>
+                                        <th>Batch Name</th>
+                                        <th>Purchase Date</th>
+                                        <th>Serial Number</th>
+                                        <th>Assignment Date</th>
+                                        <th>Value</th>
+                                        <th>Quantity</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      ${allRows.map((row: any) => `
+                                        <tr>
+                                          <td>${row.asset_name}</td>
+                                          <td>${row.asset_number}</td>
+                                          <td>${row.batch_name}</td>
+                                          <td>${new Date(row.purchase_date).toLocaleDateString()}</td>
+                                          <td>${row.serial_number}</td>
+                                          <td>${row.assignment_date ? new Date(row.assignment_date).toLocaleDateString() : "—"}</td>
+                                          <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(row.value)}</td>
+                                          <td>1</td>
+                                        </tr>
+                                      `).join("")}
+                                    </tbody>
+                                  </table>
+                                `;
+                        })()
+                      }
+                        </body>
+                      </html>`;
+                    const win = window.open("", "_blank");
+                    win!.document.write(html);
+                    win!.document.close();
+                    win!.print();
+                  }}
+                  className="gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print
+                </Button>
+              )}
+            </div>
           </DialogHeader>
 
           {selected && (
@@ -414,61 +529,61 @@ export default function AllStationsPage() {
                         const stationAssignments = asset.assignments?.filter(
                           (a: any) => a.pump_id === selected?.id
                         ) || [];
-                        
+
                         if (stationAssignments.length === 0) return null;
-                        
+
                         // Collect all batch allocations for this station
                         const batchAllocations: any[] = [];
                         stationAssignments.forEach((assignment: any) => {
                           if (assignment.batch_allocations) {
                             assignment.batch_allocations.forEach((alloc: any) => {
-                              batchAllocations.push(alloc);
+                              batchAllocations.push({
+                                ...alloc,
+                                assignment_date: alloc.assignment_date || assignment.assignment_date
+                              });
                             });
                           }
                         });
-                        
+
                         return (
                           <div key={asset.id} className="border rounded-lg p-4 space-y-2">
                             <div className="font-semibold text-base">{asset.asset_name}</div>
                             <div className="text-sm text-muted-foreground">Asset #: {asset.asset_number || "—"}</div>
-                            
+
                             {batchAllocations.length > 0 ? (
-                              <div className="mt-3">
-                                <div className="text-sm font-semibold mb-2">Batch Details:</div>
-                                <div className="space-y-2">
-                                  {batchAllocations.map((alloc: any, idx: number) => {
-                                    const batch = alloc.batch;
-                                    if (!batch) return null;
-                                    
-                                    const value = batch.purchase_price || 0;
-                                    return (
-                                      <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
-                                        <div className="flex-1">
-                                          <div className="font-medium">
-                                            Batch: {batch.batch_name || `Batch #${batch.id}`}
-                                          </div>
-                                          <div className="text-xs text-muted-foreground">
-                                            Date: {new Date(batch.purchase_date).toLocaleDateString()}
-                                          </div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="font-semibold text-orange-600">
-                                            {new Intl.NumberFormat('en-US', {
-                                              style: 'currency',
-                                              currency: 'SAR',
-                                              minimumFractionDigits: 2,
-                                              maximumFractionDigits: 2,
-                                            }).format(value)}
-                                          </div>
-                                          <div className="text-xs text-muted-foreground">Qty: 1</div>
-                                        </div>
+                              <div className="mt-2 text-xs space-y-2 ml-2">
+                                {batchAllocations.map((alloc: any, idx: number) => {
+                                  const batch = alloc.batch;
+                                  if (!batch) return null;
+
+                                  return (
+                                    <div key={idx} className="space-y-1">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 font-medium">
+                                          Batch: {batch.batch_name || `#${batch.id}`}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          Purchase: {new Date(batch.purchase_date).toLocaleDateString()}
+                                        </span>
                                       </div>
-                                    );
-                                  })}
-                                </div>
+                                      <div className="ml-2 flex flex-wrap items-center gap-1.5">
+                                        {alloc.serial_number && (
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-medium break-all">
+                                            Serial #: {alloc.serial_number}
+                                          </span>
+                                        )}
+                                        {alloc.assignment_date && (
+                                          <span className="text-muted-foreground">
+                                            Assigned: {new Date(alloc.assignment_date).toLocaleDateString()}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             ) : (
-                              <div className="text-sm text-muted-foreground mt-2">No batch details available</div>
+                              <div className="text-sm text-muted-foreground mt-2 ml-2">No batch details available</div>
                             )}
                           </div>
                         );
