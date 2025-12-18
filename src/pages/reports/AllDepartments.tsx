@@ -28,7 +28,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Check, ChevronsUpDown, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -119,13 +123,13 @@ export default function AllDepartmentsComponent() {
     // Fetch employees for this department
     await fetchDepartmentEmployees(dept.id);
   };
-
+  
   // Open employee details
   const openEmployeeDetails = async (employee: Employee) => {
     setSelectedEmployeeForDetails(employee);
     setLoadingEmployeeAssignments(true);
     setEmployeeDetailsOpen(true);
-
+    
     try {
       const res = await fetch(`${API_BASE}/api/employees/${employee.id}/assignments`, {
         credentials: "include",
@@ -152,7 +156,7 @@ export default function AllDepartmentsComponent() {
       const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/departments/${selected.id}`, {
         method: "PUT",
-        headers: {
+        headers: { 
           "Content-Type": "application/json",
           ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
         },
@@ -210,7 +214,7 @@ export default function AllDepartmentsComponent() {
         `${API_BASE}/api/departments/${selectedDepartmentForAssign.id}/employees`,
         {
           method: "POST",
-          headers: {
+          headers: { 
             "Content-Type": "application/json",
             ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
           },
@@ -336,7 +340,7 @@ export default function AllDepartmentsComponent() {
           </DialogHeader>
 
           {selected && (
-            <form
+            <form 
               className="grid grid-cols-2 gap-4"
               onSubmit={(e) => e.preventDefault()}
             >
@@ -460,9 +464,9 @@ export default function AllDepartmentsComponent() {
                   >
                     {selectedEmployeeId
                       ? availableEmployees.find((emp) => emp.id.toString() === selectedEmployeeId)?.name +
-                      (availableEmployees.find((emp) => emp.id.toString() === selectedEmployeeId)?.employee_id
-                        ? ` (${availableEmployees.find((emp) => emp.id.toString() === selectedEmployeeId)?.employee_id})`
-                        : "")
+                        (availableEmployees.find((emp) => emp.id.toString() === selectedEmployeeId)?.employee_id
+                          ? ` (${availableEmployees.find((emp) => emp.id.toString() === selectedEmployeeId)?.employee_id})`
+                          : "")
                       : "Choose an employee..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -554,7 +558,7 @@ export default function AllDepartmentsComponent() {
                   Employee Asset Assignments
                 </DialogTitle>
                 <DialogDescription>
-                  {selectedEmployeeForDetails
+                  {selectedEmployeeForDetails 
                     ? `Assets assigned to ${selectedEmployeeForDetails.name}${selectedEmployeeForDetails.employee_id ? ` (${selectedEmployeeForDetails.employee_id})` : ""}`
                     : "View employee asset assignments"}
                 </DialogDescription>
@@ -605,11 +609,11 @@ export default function AllDepartmentsComponent() {
                             </thead>
                             <tbody>
                               ${employeeAssignments.map((assignment: any) => {
-                      const batch = assignment.batch;
-                      if (!batch) return "";
-                      const asset = batch.asset;
-                      const value = batch.purchase_price || 0;
-                      return `
+                                const batch = assignment.batch;
+                                if (!batch) return "";
+                                const asset = batch.asset;
+                                const value = batch.purchase_price || 0;
+                                return `
                                   <tr>
                                     <td>${asset?.asset_name || "Unknown Asset"}</td>
                                     <td>${asset?.asset_number || "—"}</td>
@@ -621,7 +625,7 @@ export default function AllDepartmentsComponent() {
                                     <td>1</td>
                                   </tr>
                                 `;
-                    }).join("")}
+                              }).join("")}
                             </tbody>
                           </table>
                         </body>
@@ -640,61 +644,199 @@ export default function AllDepartmentsComponent() {
             </div>
           </DialogHeader>
 
-          {selectedEmployeeForDetails && (
-            <div className="space-y-4">
-              {loadingEmployeeAssignments ? (
-                <p className="text-sm text-muted-foreground">Loading assignments...</p>
-              ) : employeeAssignments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No assets assigned to this employee.</p>
-              ) : (
-                <div className="space-y-4">
-                  {employeeAssignments.map((assignment: any) => {
-                    const batch = assignment.batch;
-                    if (!batch) return null;
-
-                    const asset = batch.asset;
-                    const value = batch.purchase_price || 0;
-
-                    return (
-                      <div key={assignment.id} className="border rounded-lg p-3 space-y-2 bg-white/50">
-                        <div className="font-semibold text-base text-foreground">
-                          {asset?.asset_name || "Unknown Asset"}
-                          {asset?.asset_number && <span className="text-muted-foreground font-normal ml-1">({asset.asset_number})</span>}
-                        </div>
-
-                        <div className="ml-2 space-y-1">
-                          <div className="text-xs space-y-1">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 font-medium">
-                                Batch: {batch.batch_name || `#${batch.id}`}
-                              </span>
-                              <span className="text-muted-foreground">
-                                Purchase: {new Date(batch.purchase_date).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <div className="ml-2 space-y-1">
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {assignment.serial_number && (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-medium break-all">
-                                    Serial #: {assignment.serial_number}
+          {selectedEmployeeForDetails && (() => {
+            // Transform flat assignments array to grouped structure (by asset, then batch, then items)
+            const assetSummary = new Map<string, {
+              asset_id: number;
+              asset_name: string;
+              asset_number: string;
+              batches: Map<number, {
+                batch_id: number;
+                batch_name: string | null;
+                purchase_date: string | null;
+                items: any[];
+              }>;
+            }>();
+            
+            employeeAssignments.forEach((assignment: any) => {
+              const batch = assignment.batch;
+              if (!batch || !batch.asset) return;
+              
+              const asset = batch.asset;
+              const assetKey = `${asset.id}`;
+              
+              if (!assetSummary.has(assetKey)) {
+                assetSummary.set(assetKey, {
+                  asset_id: asset.id,
+                  asset_name: asset.asset_name,
+                  asset_number: asset.asset_number || "",
+                  batches: new Map(),
+                });
+              }
+              
+              const assetData = assetSummary.get(assetKey)!;
+              const batchKey = batch.id;
+              
+              if (!assetData.batches.has(batchKey)) {
+                assetData.batches.set(batchKey, {
+                  batch_id: batch.id,
+                  batch_name: batch.batch_name,
+                  purchase_date: batch.purchase_date,
+                  items: [],
+                });
+              }
+              
+              const batchData = assetData.batches.get(batchKey)!;
+              batchData.items.push({
+                id: assignment.id,
+                serial_number: assignment.serial_number,
+                assignment_date: assignment.assignment_date,
+              });
+            });
+            
+            const groupedAssignments = Array.from(assetSummary.values()).map(asset => ({
+              asset_id: asset.asset_id,
+              asset_name: asset.asset_name,
+              asset_number: asset.asset_number,
+              batches: Array.from(asset.batches.values()),
+            }));
+            
+            return (
+              <div className="space-y-4">
+                {loadingEmployeeAssignments ? (
+                  <p className="text-sm text-muted-foreground">Loading assignments...</p>
+                ) : groupedAssignments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No assets assigned to this employee.</p>
+                ) : (
+                  <div className="mt-1 space-y-2 pl-2 border-l-2 border-orange-300 bg-orange-50/50 rounded-r p-2">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="text-xs font-semibold text-orange-700 uppercase tracking-wide">
+                        Assigned Assets:
+                      </div>
+                      {groupedAssignments.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const html = `
+                              <html>
+                                <head>
+                                  <title>Employee Assets - ${selectedEmployeeForDetails.name}</title>
+                                  <style>
+                                    body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+                                    h1 { text-align: center; color: #333; }
+                                    .employee-info { background: #fff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+                                    .employee-info p { margin: 5px 0; }
+                                    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; }
+                                    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                                    th { background: #f0f0f0; font-weight: bold; }
+                                    tr:nth-child(even) { background: #fafafa; }
+                                  </style>
+                                </head>
+                                <body>
+                                  <h1>Employee Assets Report</h1>
+                                  <div class="employee-info">
+                                    <p><strong>Employee Name:</strong> ${selectedEmployeeForDetails.name}</p>
+                                    <p><strong>Employee ID:</strong> ${selectedEmployeeForDetails.employee_id || "—"}</p>
+                                    <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
+                                  </div>
+                                  <h2>Assigned Assets</h2>
+                                  <table>
+                                    <thead>
+                                      <tr>
+                                        <th>Asset Name</th>
+                                        <th>Asset Number</th>
+                                        <th>Batch Name</th>
+                                        <th>Purchase Date</th>
+                                        <th>Serial Number</th>
+                                        <th>Assignment Date</th>
+                                        <th>Value</th>
+                                        <th>Quantity</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      ${employeeAssignments.map((assignment: any) => {
+                                        const batch = assignment.batch;
+                                        if (!batch) return "";
+                                        const asset = batch.asset;
+                                        const value = batch.purchase_price || 0;
+                                        return `
+                                          <tr>
+                                            <td>${asset?.asset_name || "Unknown Asset"}</td>
+                                            <td>${asset?.asset_number || "—"}</td>
+                                            <td>${batch.batch_name || `Batch #${batch.id}`}</td>
+                                            <td>${new Date(batch.purchase_date).toLocaleDateString()}</td>
+                                            <td>${assignment.serial_number || "—"}</td>
+                                            <td>${assignment.assignment_date ? new Date(assignment.assignment_date).toLocaleDateString() : "—"}</td>
+                                            <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(value)}</td>
+                                            <td>1</td>
+                                          </tr>
+                                        `;
+                                      }).join("")}
+                                    </tbody>
+                                  </table>
+                                </body>
+                              </html>`;
+                            const win = window.open("", "_blank");
+                            win!.document.write(html);
+                            win!.document.close();
+                            win!.print();
+                          }}
+                          className="h-6 px-2 text-xs gap-1"
+                        >
+                          <Printer className="w-3 h-3" />
+                          Print
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {groupedAssignments.map((asset) => (
+                        <div key={asset.asset_id} className="text-sm">
+                          <div className="font-semibold text-foreground mb-1">
+                            {asset.asset_name} <span className="text-muted-foreground font-normal">({asset.asset_number})</span>
+                          </div>
+                          <div className="ml-2 space-y-2">
+                            {asset.batches.map((batch) => (
+                              <div key={batch.batch_id} className="text-xs space-y-1">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 font-medium">
+                                    Batch: {batch.batch_name || `#${batch.batch_id}`}
                                   </span>
-                                )}
-                                {assignment.assignment_date && (
-                                  <span className="text-muted-foreground">
-                                    Assigned: {new Date(assignment.assignment_date).toLocaleDateString()}
-                                  </span>
+                                  {batch.purchase_date && (
+                                    <span className="text-muted-foreground">
+                                      Purchase: {new Date(batch.purchase_date).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                </div>
+                                {batch.items && batch.items.length > 0 && (
+                                  <div className="ml-2 space-y-1">
+                                    {batch.items.map((item: any, idx: number) => (
+                                      <div key={item.id || idx} className="flex flex-wrap items-center gap-1.5">
+                                        {item.serial_number && (
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-medium">
+                                            Serial #: {item.serial_number}
+                                          </span>
+                                        )}
+                                        {item.assignment_date && (
+                                          <span className="text-muted-foreground">
+                                            Assigned: {new Date(item.assignment_date).toLocaleDateString()}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
-                            </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </>

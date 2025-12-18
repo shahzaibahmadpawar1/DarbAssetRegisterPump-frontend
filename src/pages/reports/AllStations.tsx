@@ -105,7 +105,7 @@ export default function AllStationsPage() {
     setEditMode(false);
     setOpen(true);
     setLoadingAssets(true);
-
+    
     // Fetch assets assigned to this station
     try {
       const res = await fetch(`${API_BASE}/api/assets?pump_id=${pump.id}`, { credentials: "include" });
@@ -133,7 +133,7 @@ export default function AllStationsPage() {
       const storedToken = localStorage.getItem("auth_token");
       const res = await fetch(`${API_BASE}/api/pumps/${selected.id}`, {
         method: "PUT",
-        headers: {
+        headers: { 
           "Content-Type": "application/json",
           ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
         },
@@ -205,8 +205,8 @@ export default function AllStationsPage() {
               </thead>
               <tbody>
                 ${departments
-          .map(
-            (d) => `
+                  .map(
+                    (d) => `
                     <tr>
                       <td>${d.id}</td>
                       <td>${d.name}</td>
@@ -214,8 +214,8 @@ export default function AllStationsPage() {
                       <td>${d.employeeCount || 0}</td>
                       <td>${d.totalAssetValue ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(d.totalAssetValue) : '—'}</td>
                     </tr>`
-          )
-          .join("")}
+                  )
+                  .join("")}
               </tbody>
             </table>
           </body>
@@ -226,7 +226,7 @@ export default function AllStationsPage() {
       win!.print();
     } else {
       // Print stations
-      const html = `
+    const html = `
       <html>
         <head>
           <title>All Stations</title>
@@ -253,8 +253,8 @@ export default function AllStationsPage() {
             </thead>
             <tbody>
               ${stations
-          .map(
-            (s) => `
+                .map(
+                  (s) => `
                   <tr>
                     <td>${s.id}</td>
                     <td>${s.name}</td>
@@ -262,16 +262,16 @@ export default function AllStationsPage() {
                     <td>${s.manager}</td>
                     <td>${s.assetCount}</td>
                   </tr>`
-          )
-          .join("")}
+                )
+                .join("")}
             </tbody>
           </table>
         </body>
       </html>`;
-      const win = window.open("", "_blank");
-      win!.document.write(html);
-      win!.document.close();
-      win!.print();
+    const win = window.open("", "_blank");
+    win!.document.write(html);
+    win!.document.close();
+    win!.print();
     }
   };
 
@@ -280,8 +280,8 @@ export default function AllStationsPage() {
       <div className="flex justify-between items-center mb-6">
         <BackToDashboardButton />
         <h1 className="text-3xl font-bold">All Stations/Departments</h1>
-        <Button
-          onClick={handlePrint}
+        <Button 
+          onClick={handlePrint} 
           variant="outline"
           className="bg-white/60 backdrop-blur-md hover:bg-white/80"
         >
@@ -297,53 +297,53 @@ export default function AllStationsPage() {
 
         <TabsContent value="stations">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {stations.map((s) => (
-              <Card
-                key={s.id}
-                className="bg-white/60 backdrop-blur-md hover:bg-white/80 transition hover:shadow-lg"
+        {stations.map((s) => (
+          <Card
+            key={s.id}
+            className="bg-white/60 backdrop-blur-md hover:bg-white/80 transition hover:shadow-lg"
+          >
+            <CardHeader>
+              <div className="flex justify-between items-start">
+              <CardTitle className="text-lg">{s.name}</CardTitle>
+                {s.totalAssetValue !== undefined && s.totalAssetValue > 0 && (
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">Total Value</div>
+                    <div className="text-lg font-bold text-orange-600">
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'SAR',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }).format(s.totalAssetValue)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div>
+                <span className="text-sm font-semibold">Location: </span>
+                <span className="text-sm text-muted-foreground">{s.location}</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold">Manager: </span>
+                <span className="text-sm text-muted-foreground">{s.manager}</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold">Assets: </span>
+                <span className="text-sm text-muted-foreground">{s.assetCount}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openDetails(s)}
+                className="w-full mt-4"
               >
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{s.name}</CardTitle>
-                    {s.totalAssetValue !== undefined && s.totalAssetValue > 0 && (
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground">Total Value</div>
-                        <div className="text-lg font-bold text-orange-600">
-                          {new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: 'SAR',
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          }).format(s.totalAssetValue)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div>
-                    <span className="text-sm font-semibold">Location: </span>
-                    <span className="text-sm text-muted-foreground">{s.location}</span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold">Manager: </span>
-                    <span className="text-sm text-muted-foreground">{s.manager}</span>
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold">Assets: </span>
-                    <span className="text-sm text-muted-foreground">{s.assetCount}</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openDetails(s)}
-                    className="w-full mt-4"
-                  >
-                    Details
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                Details
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
           </div>
         </TabsContent>
 
@@ -358,14 +358,14 @@ export default function AllStationsPage() {
           <DialogHeader>
             <div className="flex justify-between items-center">
               <div>
-                <DialogTitle>
-                  {editMode ? "Edit Station" : "Station Details"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editMode
-                    ? "Update station information below."
-                    : "View station details."}
-                </DialogDescription>
+            <DialogTitle>
+              {editMode ? "Edit Station" : "Station Details"}
+            </DialogTitle>
+            <DialogDescription>
+              {editMode
+                ? "Update station information below."
+                : "View station details."}
+            </DialogDescription>
               </div>
               {!editMode && selected && (
                 <Button
@@ -401,38 +401,38 @@ export default function AllStationsPage() {
                             <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
                           </div>
                           <h2>Assigned Assets</h2>
-                          ${stationAssets.length === 0
-                        ? "<p>No assets assigned to this station.</p>"
-                        : (() => {
-                          const allRows: any[] = [];
-                          stationAssets.forEach((asset: any) => {
-                            const stationAssignments = asset.assignments?.filter(
-                              (a: any) => a.pump_id === selected.id
-                            ) || [];
-
-                            stationAssignments.forEach((assignment: any) => {
-                              if (assignment.batch_allocations) {
-                                assignment.batch_allocations.forEach((alloc: any) => {
-                                  const batch = alloc.batch;
-                                  if (batch) {
-                                    allRows.push({
-                                      asset_name: asset.asset_name,
-                                      asset_number: asset.asset_number || "—",
-                                      batch_name: batch.batch_name || `Batch #${batch.id}`,
-                                      purchase_date: batch.purchase_date,
-                                      serial_number: alloc.serial_number || "—",
-                                      assignment_date: assignment.assignment_date || alloc.assignment_date,
-                                      value: batch.purchase_price || 0
-                                    });
-                                  }
+                          ${stationAssets.length === 0 
+                            ? "<p>No assets assigned to this station.</p>"
+                            : (() => {
+                                const allRows: any[] = [];
+                                stationAssets.forEach((asset: any) => {
+                                  const stationAssignments = asset.assignments?.filter(
+                                    (a: any) => a.pump_id === selected.id
+                                  ) || [];
+                                  
+                                  stationAssignments.forEach((assignment: any) => {
+                                    if (assignment.batch_allocations) {
+                                      assignment.batch_allocations.forEach((alloc: any) => {
+                                        const batch = alloc.batch;
+                                        if (batch) {
+                                          allRows.push({
+                                            asset_name: asset.asset_name,
+                                            asset_number: asset.asset_number || "—",
+                                            batch_name: batch.batch_name || `Batch #${batch.id}`,
+                                            purchase_date: batch.purchase_date,
+                                            serial_number: alloc.serial_number || "—",
+                                            assignment_date: assignment.assignment_date || alloc.assignment_date,
+                                            value: batch.purchase_price || 0
+                                          });
+                                        }
+                                      });
+                                    }
+                                  });
                                 });
-                              }
-                            });
-                          });
-
-                          if (allRows.length === 0) return "<p>No assets assigned to this station.</p>";
-
-                          return `
+                                
+                                if (allRows.length === 0) return "<p>No assets assigned to this station.</p>";
+                                
+                                return `
                                   <table>
                                     <thead>
                                       <tr>
@@ -462,8 +462,8 @@ export default function AllStationsPage() {
                                     </tbody>
                                   </table>
                                 `;
-                        })()
-                      }
+                              })()
+                          }
                         </body>
                       </html>`;
                     const win = window.open("", "_blank");
@@ -522,74 +522,236 @@ export default function AllStationsPage() {
                     <p className="text-sm text-muted-foreground">Loading assets...</p>
                   ) : stationAssets.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No assets assigned to this station.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {stationAssets.map((asset) => {
-                        // Get assignments for this station
-                        const stationAssignments = asset.assignments?.filter(
-                          (a: any) => a.pump_id === selected?.id
-                        ) || [];
-
-                        if (stationAssignments.length === 0) return null;
-
-                        // Collect all batch allocations for this station
-                        const batchAllocations: any[] = [];
-                        stationAssignments.forEach((assignment: any) => {
-                          if (assignment.batch_allocations) {
-                            assignment.batch_allocations.forEach((alloc: any) => {
-                              batchAllocations.push({
-                                ...alloc,
-                                assignment_date: alloc.assignment_date || assignment.assignment_date
-                              });
-                            });
-                          }
+                  ) : (() => {
+                    // Transform station assets to grouped structure (by asset, then batch, then items)
+                    const assetSummary = new Map<number, {
+                      asset_id: number;
+                      asset_name: string;
+                      asset_number: string;
+                      batches: Map<number, {
+                        batch_id: number;
+                        batch_name: string | null;
+                        purchase_date: string | null;
+                        items: any[];
+                      }>;
+                    }>();
+                    
+                    stationAssets.forEach((asset) => {
+                      // Get assignments for this station
+                      // Use Number() to ensure type consistency in comparison
+                      const stationAssignments = asset.assignments?.filter(
+                        (a: any) => Number(a.pump_id) === Number(selected?.id)
+                      ) || [];
+                      
+                      if (stationAssignments.length === 0) return;
+                      
+                      const assetKey = asset.id;
+                      
+                      if (!assetSummary.has(assetKey)) {
+                        assetSummary.set(assetKey, {
+                          asset_id: asset.id,
+                          asset_name: asset.asset_name,
+                          asset_number: asset.asset_number || "",
+                          batches: new Map(),
                         });
-
-                        return (
-                          <div key={asset.id} className="border rounded-lg p-4 space-y-2">
-                            <div className="font-semibold text-base">{asset.asset_name}</div>
-                            <div className="text-sm text-muted-foreground">Asset #: {asset.asset_number || "—"}</div>
-
-                            {batchAllocations.length > 0 ? (
-                              <div className="mt-2 text-xs space-y-2 ml-2">
-                                {batchAllocations.map((alloc: any, idx: number) => {
-                                  const batch = alloc.batch;
-                                  if (!batch) return null;
-
-                                  return (
-                                    <div key={idx} className="space-y-1">
-                                      <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 font-medium">
-                                          Batch: {batch.batch_name || `#${batch.id}`}
-                                        </span>
+                      }
+                      
+                      const assetData = assetSummary.get(assetKey)!;
+                      
+                      // Collect all batch allocations for this station
+                      stationAssignments.forEach((assignment: any) => {
+                        // Check if batch_allocations exists and is an array with items
+                        if (assignment.batch_allocations && Array.isArray(assignment.batch_allocations) && assignment.batch_allocations.length > 0) {
+                          assignment.batch_allocations.forEach((alloc: any) => {
+                            const batch = alloc.batch;
+                            if (!batch) return;
+                            
+                            const batchKey = batch.id;
+                            
+                            if (!assetData.batches.has(batchKey)) {
+                              assetData.batches.set(batchKey, {
+                                batch_id: batch.id,
+                                batch_name: batch.batch_name,
+                                purchase_date: batch.purchase_date,
+                                items: [],
+                              });
+                            }
+                            
+                            const batchData = assetData.batches.get(batchKey)!;
+                            batchData.items.push({
+                              id: alloc.id || `${assignment.id}_${batch.id}_${batchData.items.length}`,
+                              serial_number: alloc.serial_number,
+                              assignment_date: alloc.assignment_date || assignment.assignment_date || null,
+                            });
+                          });
+                        }
+                      });
+                    });
+                    
+                    const groupedAssets = Array.from(assetSummary.values()).map(asset => ({
+                      asset_id: asset.asset_id,
+                      asset_name: asset.asset_name,
+                      asset_number: asset.asset_number,
+                      batches: Array.from(asset.batches.values()),
+                    }));
+                    
+                    if (groupedAssets.length === 0) {
+                      return <p className="text-sm text-muted-foreground">No assets assigned to this station.</p>;
+                    }
+                    
+                    return (
+                      <div className="mt-1 space-y-2 pl-2 border-l-2 border-orange-300 bg-orange-50/50 rounded-r p-2">
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="text-xs font-semibold text-orange-700 uppercase tracking-wide">
+                            Assigned Assets:
+                          </div>
+                          {groupedAssets.length > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const html = `
+                                  <html>
+                                    <head>
+                                      <title>Station Assets - ${selected?.name}</title>
+                                      <style>
+                                        body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+                                        h1 { text-align: center; color: #333; }
+                                        .station-info { background: #fff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+                                        .station-info p { margin: 5px 0; }
+                                        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; }
+                                        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                                        th { background: #f0f0f0; font-weight: bold; }
+                                        tr:nth-child(even) { background: #fafafa; }
+                                      </style>
+                                    </head>
+                                    <body>
+                                      <h1>Station Assets Report</h1>
+                                      <div class="station-info">
+                                        <p><strong>Station Name:</strong> ${selected?.name || "—"}</p>
+                                        <p><strong>Location:</strong> ${selected?.location || "—"}</p>
+                                        <p><strong>Manager:</strong> ${selected?.manager || "—"}</p>
+                                        <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
+                                      </div>
+                                      <h2>Assigned Assets</h2>
+                                      <table>
+                                        <thead>
+                                          <tr>
+                                            <th>Asset Name</th>
+                                            <th>Asset Number</th>
+                                            <th>Batch Name</th>
+                                            <th>Purchase Date</th>
+                                            <th>Serial Number</th>
+                                            <th>Assignment Date</th>
+                                            <th>Value</th>
+                                            <th>Quantity</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          ${(() => {
+                                            const allRows: any[] = [];
+                                            stationAssets.forEach((asset) => {
+                                              const stationAssignments = asset.assignments?.filter(
+                                                (a: any) => a.pump_id === selected?.id
+                                              ) || [];
+                                              
+                                              stationAssignments.forEach((assignment: any) => {
+                                                if (assignment.batch_allocations) {
+                                                  assignment.batch_allocations.forEach((alloc: any) => {
+                                                    const batch = alloc.batch;
+                                                    if (!batch) return;
+                                                    const value = batch.purchase_price || 0;
+                                                    allRows.push({
+                                                      asset_name: asset.asset_name,
+                                                      asset_number: asset.asset_number || "—",
+                                                      batch_name: batch.batch_name || `Batch #${batch.id}`,
+                                                      purchase_date: batch.purchase_date,
+                                                      serial_number: alloc.serial_number || "—",
+                                                      assignment_date: assignment.assignment_date || alloc.assignment_date,
+                                                      value: value,
+                                                    });
+                                                  });
+                                                }
+                                              });
+                                            });
+                                            
+                                            if (allRows.length === 0) return "<tr><td colspan='8'>No assets assigned to this station.</td></tr>";
+                                            
+                                            return allRows.map((row: any) => `
+                                              <tr>
+                                                <td>${row.asset_name}</td>
+                                                <td>${row.asset_number}</td>
+                                                <td>${row.batch_name}</td>
+                                                <td>${new Date(row.purchase_date).toLocaleDateString()}</td>
+                                                <td>${row.serial_number}</td>
+                                                <td>${row.assignment_date ? new Date(row.assignment_date).toLocaleDateString() : "—"}</td>
+                                                <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(row.value)}</td>
+                                                <td>1</td>
+                                              </tr>
+                                            `).join("");
+                                          })()}
+                                        </tbody>
+                                      </table>
+                                    </body>
+                                  </html>`;
+                                const win = window.open("", "_blank");
+                                win!.document.write(html);
+                                win!.document.close();
+                                win!.print();
+                              }}
+                              className="h-6 px-2 text-xs gap-1"
+                            >
+                              <Printer className="w-3 h-3" />
+                              Print
+                            </Button>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {groupedAssets.map((asset) => (
+                            <div key={asset.asset_id} className="text-sm">
+                              <div className="font-semibold text-foreground mb-1">
+                                {asset.asset_name} <span className="text-muted-foreground font-normal">({asset.asset_number})</span>
+                              </div>
+                              <div className="ml-2 space-y-2">
+                                {asset.batches.map((batch) => (
+                                  <div key={batch.batch_id} className="text-xs space-y-1">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 font-medium">
+                                        Batch: {batch.batch_name || `#${batch.batch_id}`}
+                                      </span>
+                                      {batch.purchase_date && (
                                         <span className="text-muted-foreground">
                                           Purchase: {new Date(batch.purchase_date).toLocaleDateString()}
                                         </span>
-                                      </div>
-                                      <div className="ml-2 flex flex-wrap items-center gap-1.5">
-                                        {alloc.serial_number && (
-                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-medium break-all">
-                                            Serial #: {alloc.serial_number}
-                                          </span>
-                                        )}
-                                        {alloc.assignment_date && (
-                                          <span className="text-muted-foreground">
-                                            Assigned: {new Date(alloc.assignment_date).toLocaleDateString()}
-                                          </span>
-                                        )}
-                                      </div>
+                                      )}
                                     </div>
-                                  );
-                                })}
+                                    {batch.items && batch.items.length > 0 && (
+                                      <div className="ml-2 space-y-1">
+                                        {batch.items.map((item: any, idx: number) => (
+                                          <div key={item.id || idx} className="flex flex-wrap items-center gap-1.5">
+                                            {item.serial_number && (
+                                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-medium">
+                                                Serial #: {item.serial_number}
+                                              </span>
+                                            )}
+                                            {item.assignment_date && (
+                                              <span className="text-muted-foreground">
+                                                Assigned: {new Date(item.assignment_date).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
-                            ) : (
-                              <div className="text-sm text-muted-foreground mt-2 ml-2">No batch details available</div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -597,17 +759,17 @@ export default function AllStationsPage() {
                 {!editMode ? (
                   <>
                     {isAdmin && (
-                      <>
-                        <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
-                          ✏️ Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          onClick={() => deleteStation(selected.id)}
-                        >
-                          🗑️ Delete
-                        </Button>
+                  <>
+                    <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
+                      ✏️ Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => deleteStation(selected.id)}
+                    >
+                      🗑️ Delete
+                    </Button>
                       </>
                     )}
                   </>
