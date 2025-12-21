@@ -16,6 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Card } from "@/components/ui/card";
+import { Printer } from "lucide-react";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 
 type Category = {
@@ -208,45 +210,51 @@ export default function AssetsByCategoryReport() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-3 sm:p-4 md:p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
-        <BackToDashboardButton />
-        <div className="w-full sm:w-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold">Assets by Category</h1>
-          <p className="text-sm text-black">
-            Total inventory value:{" "}
-            <span className="font-semibold">
-              {totalInventoryValue.toLocaleString()}
-            </span>
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6">
+          <div className="space-y-2">
+            <BackToDashboardButton />
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              Assets by Category
+            </h1>
+            <div className="px-4 py-2 rounded-xl bg-primary/10 border-2 border-primary/20 inline-block">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">
+                Total Inventory Value
+              </p>
+              <p className="text-xl font-bold text-primary">
+                SAR {totalInventoryValue.toLocaleString()}
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 justify-between">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 flex-1">
-        {/* Category Filter */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
-          <span className="font-semibold text-sm sm:text-base shrink-0">Category:</span>
-          <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Filters */}
+        <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg p-6">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 justify-between">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 flex-1">
+            {/* Category Filter */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
+              <span className="font-semibold text-sm sm:text-base shrink-0">Category:</span>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger className="w-full sm:w-64 h-11 border-2 focus:border-primary">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        {/* Pump Filter */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
-          <span className="font-semibold text-sm sm:text-base shrink-0">Station/Department:</span>
-          <Select value={pumpId} onValueChange={setPumpId}>
-            <SelectTrigger className="w-full sm:w-64">
+            {/* Pump Filter */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
+              <span className="font-semibold text-sm sm:text-base shrink-0">Station/Department:</span>
+              <Select value={pumpId} onValueChange={setPumpId}>
+                <SelectTrigger className="w-full sm:w-64 h-11 border-2 focus:border-primary">
               <SelectValue placeholder="Select Station/Department" />
             </SelectTrigger>
             <SelectContent>
@@ -264,7 +272,7 @@ export default function AssetsByCategoryReport() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
           <span className="font-semibold text-sm sm:text-base shrink-0">Employee:</span>
           <Select value={employeeId} onValueChange={setEmployeeId}>
-            <SelectTrigger className="w-full sm:w-64">
+            <SelectTrigger className="w-full sm:w-64 h-11 border-2 focus:border-primary">
               <SelectValue placeholder="Select Employee" />
             </SelectTrigger>
             <SelectContent>
@@ -281,15 +289,18 @@ export default function AssetsByCategoryReport() {
         <Button 
           variant="outline" 
           onClick={handlePrint}
-          className="bg-white/60 backdrop-blur-md hover:bg-white/80 w-full sm:w-auto shrink-0"
+          className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
         >
-          🖨️ Print
+          <Printer className="w-4 h-4 mr-2" />
+          Print
         </Button>
-      </div>
+        </div>
+      </Card>
 
       {/* Assets Table */}
-      <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md -mx-3 sm:mx-0">
-        <Table className="w-full min-w-[800px] sm:min-w-0">
+      <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+        <div className="overflow-x-auto">
+          <Table className="w-full min-w-[800px] sm:min-w-0">
           <TableHeader>
           <TableRow>
             <TableHead>Asset Name</TableHead>
@@ -327,6 +338,8 @@ export default function AssetsByCategoryReport() {
             )}
           </TableBody>
         </Table>
+        </div>
+      </Card>
       </div>
     </div>
   );

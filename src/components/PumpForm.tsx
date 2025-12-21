@@ -64,10 +64,10 @@ function DepartmentFormInline({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="space-y-2">
-          <Label htmlFor="dept-name" className="text-sm font-medium">
+          <Label htmlFor="dept-name" className="text-sm font-semibold">
             Department Name <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -76,12 +76,12 @@ function DepartmentFormInline({
             value={formData.name}
             onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
             placeholder="e.g., IT Department"
-            className="h-10"
+            className="h-11 border-2 focus:border-primary transition-colors"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="dept-manager" className="text-sm font-medium">
+          <Label htmlFor="dept-manager" className="text-sm font-semibold">
             Manager Name <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -90,16 +90,25 @@ function DepartmentFormInline({
             value={formData.manager}
             onChange={(e) => setFormData((prev) => ({ ...prev, manager: e.target.value }))}
             placeholder="e.g., John Smith"
-            className="h-10"
+            className="h-11 border-2 focus:border-primary transition-colors"
           />
         </div>
       </div>
 
-      <div className="flex gap-2 justify-end pt-2">
-        <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
+      <div className="flex gap-3 justify-end pt-6">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={onCancel} 
+          className="w-full sm:w-auto border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+        >
           Cancel
         </Button>
-        <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+        <Button 
+          type="submit" 
+          disabled={loading} 
+          className="w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+        >
           {loading ? "Saving..." : "Save Department"}
         </Button>
       </div>
@@ -195,10 +204,10 @@ export default function PumpForm({
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto border-2 border-card-border">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Station" : "Add Station/Department"}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl font-bold">{isEditing ? "Edit Station" : "Add Station/Department"}</DialogTitle>
+            <DialogDescription className="text-base">
               {isEditing 
                 ? "Fill in the details for the station"
                 : "Choose to add a Station or Department"}
@@ -207,16 +216,16 @@ export default function PumpForm({
 
           {!isEditing && (
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "station" | "department")} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="station">Add Station</TabsTrigger>
-                <TabsTrigger value="department">Add Department</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm">
+                <TabsTrigger value="station" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Add Station</TabsTrigger>
+                <TabsTrigger value="department" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Add Department</TabsTrigger>
               </TabsList>
               
               <TabsContent value="station" className="mt-4">
                 <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 py-6">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">
+              <Label htmlFor="name" className="text-sm font-semibold">
                 Station Name <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -225,12 +234,12 @@ export default function PumpForm({
                 value={formData.name}
                 onChange={(e) => handleChange("name", e.target.value)}
                 placeholder="e.g., Al-Kharj Station"
-                className="h-10"
+                className="h-11 border-2 focus:border-primary transition-colors"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location" className="text-sm font-medium">
+              <Label htmlFor="location" className="text-sm font-semibold">
                 Location <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -239,12 +248,12 @@ export default function PumpForm({
                 value={formData.location}
                 onChange={(e) => handleChange("location", e.target.value)}
                 placeholder="e.g., Riyadh Road"
-                className="h-10"
+                className="h-11 border-2 focus:border-primary transition-colors"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="manager" className="text-sm font-medium">
+              <Label htmlFor="manager" className="text-sm font-semibold">
                 Manager Name <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -253,12 +262,12 @@ export default function PumpForm({
                 value={formData.manager}
                 onChange={(e) => handleChange("manager", e.target.value)}
                 placeholder="e.g., Ahmed Al-Rashid"
-                className="h-10"
+                className="h-11 border-2 focus:border-primary transition-colors"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contact_number" className="text-sm font-medium">
+              <Label htmlFor="contact_number" className="text-sm font-semibold">
                 Contact Number
               </Label>
               <Input
@@ -266,12 +275,12 @@ export default function PumpForm({
                 value={formData.contact_number}
                 onChange={(e) => handleChange("contact_number", e.target.value)}
                 placeholder="e.g., +966 50 123 4567"
-                className="h-10"
+                className="h-11 border-2 focus:border-primary transition-colors"
               />
             </div>
 
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="remarks" className="text-sm font-medium">
+              <Label htmlFor="remarks" className="text-sm font-semibold">
                 Remarks
               </Label>
               <Textarea
@@ -280,15 +289,25 @@ export default function PumpForm({
                 onChange={(e) => handleChange("remarks", e.target.value)}
                 placeholder="Any additional information..."
                 rows={3}
+                className="border-2 focus:border-primary transition-colors"
               />
             </div>
           </div>
 
-                  <DialogFooter className="gap-2 flex-col-reverse sm:flex-row mt-4">
-                    <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
+                  <DialogFooter className="gap-3 flex-col-reverse sm:flex-row pt-6">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={onClose} 
+                      className="w-full sm:w-auto border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+                    >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+                    <Button 
+                      type="submit" 
+                      disabled={loading} 
+                      className="w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+                    >
                       {loading ? "Saving..." : "Save Station"}
                     </Button>
                   </DialogFooter>

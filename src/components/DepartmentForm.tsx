@@ -82,18 +82,18 @@ export default function DepartmentForm({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto border-2 border-card-border">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-2xl font-bold">{title}</DialogTitle>
+          <DialogDescription className="text-base">
             Fill in the details for the department
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 py-6">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">
+              <Label htmlFor="name" className="text-sm font-semibold">
                 Department Name <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -102,12 +102,12 @@ export default function DepartmentForm({
                 value={formData.name}
                 onChange={(e) => handleChange("name", e.target.value)}
                 placeholder="e.g., IT Department"
-                className="h-10"
+                className="h-11 border-2 focus:border-primary transition-colors"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="manager" className="text-sm font-medium">
+              <Label htmlFor="manager" className="text-sm font-semibold">
                 Manager Name <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -116,16 +116,25 @@ export default function DepartmentForm({
                 value={formData.manager}
                 onChange={(e) => handleChange("manager", e.target.value)}
                 placeholder="e.g., John Smith"
-                className="h-10"
+                className="h-11 border-2 focus:border-primary transition-colors"
               />
             </div>
           </div>
 
-          <DialogFooter className="gap-2 flex-col-reverse sm:flex-row">
-            <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
+          <DialogFooter className="gap-3 flex-col-reverse sm:flex-row pt-6">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              className="w-full sm:w-auto border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+            <Button 
+              type="submit" 
+              disabled={loading} 
+              className="w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+            >
               {loading ? "Saving..." : "Save Department"}
             </Button>
           </DialogFooter>

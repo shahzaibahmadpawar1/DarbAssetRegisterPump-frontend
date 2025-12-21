@@ -26,11 +26,13 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { Card } from "@/components/ui/card";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 import type { Asset } from "@/components/AssetTable";
 import ViewBatchesModal from "@/components/ViewBatchesModal";
 import BarcodeScannerModal from "@/components/BarcodeScannerModal";
-import { Trash2, Search, QrCode } from "lucide-react";
+import AssetForm, { type AssetFormData } from "@/components/AssetForm";
+import { Trash2, Search, QrCode, Printer, Plus } from "lucide-react";
 
 type AssetRow = Asset & {
   asset_value?: number | null;
@@ -122,11 +124,12 @@ const buildAssetPayload = (asset: AssetRow) => ({
 });
 
 export default function AllAssetsPage() {
-  const { canAssign, isAdmin } = useUserRole();
+  const { canAssign, isAdmin, isViewingUser, isAssigningUser } = useUserRole();
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [selected, setSelected] = useState<AssetRow | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [open, setOpen] = useState(false);
+  const [showAssetForm, setShowAssetForm] = useState(false);
   const detailNumericFields = useMemo(() => new Set(["quantity", "asset_value"]), []);
   const detailReadOnlyFields = useMemo(() => new Set(["categoryName"]), []);
   
@@ -503,7 +506,8 @@ export default function AllAssetsPage() {
                 <th>Asset Name</th>
                 <th>Asset #</th>
                 <th>Barcode</th>
-                <th>Quantity</th>
+                <th>Assigned to Stations</th>
+                <th>Assigned to Employees</th>
                 <th>Units</th>
                 <th>Total Value</th>
                 <th>Remarks</th>
@@ -513,16 +517,21 @@ export default function AllAssetsPage() {
             </thead>
             <tbody>
               ${filteredAssets.length === 0 
-                ? `<tr><td colspan="10" style="text-align: center; padding: 20px; color: #999;">No assets found</td></tr>`
+                ? `<tr><td colspan="11" style="text-align: center; padding: 20px; color: #999;">No assets found</td></tr>`
                 : filteredAssets
-                .map(
-                  (a) => `
+                .map((a: any) => {
+                    const totalItems = (a.batches || []).reduce((sum: number, batch: any) => sum + (batch.quantity || 0), 0);
+                    const assignedToStations = a.totalAssignedToStations || 0;
+                    const assignedToEmployees = a.totalAssignedToEmployees || 0;
+                    const formatNumber = (num: number) => String(num).padStart(2, '0');
+                    return `
                   <tr>
                     <td>${a.id}</td>
                     <td>${a.asset_name ?? ""}</td>
                     <td>${a.asset_number ?? ""}</td>
                     <td>${a.barcode ?? ""}</td>
-                    <td>${a.quantity ?? ""}</td>
+                    <td>${totalItems > 0 ? `${formatNumber(assignedToStations)}/${formatNumber(totalItems)}` : "—"}</td>
+                    <td>${totalItems > 0 ? `${formatNumber(assignedToEmployees)}/${formatNumber(totalItems)}` : "—"}</td>
                     <td>${a.units ?? ""}</td>
                     <td>${a.totalValue ?? 0}</td>
                     <td>${a.remarks ?? ""}</td>
@@ -531,14 +540,14 @@ export default function AllAssetsPage() {
                       a.assignments && a.assignments.length > 0
                         ? a.assignments
                             .map(
-                              (as) =>
+                              (as: any) =>
                                 `${as.pump_name || `Station/Department #${as.pump_id}`}: ${as.quantity}`
                             )
                             .join("<br/>")
                         : "-"
                     }</td>
-                  </tr>`
-                )
+                  </tr>`;
+                  })
                 .join("")}
             </tbody>
           </table>
@@ -796,52 +805,69 @@ export default function AllAssetsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
-        <BackToDashboardButton />
-        <div className="w-full sm:w-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold">All Assets</h1>
-          <p className="text-sm text-black">
-            Total inventory value:{" "}
-            <span className="font-semibold">
-              {totalInventoryValue.toLocaleString()}
-            </span>
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6">
+          <div className="space-y-2">
+            <BackToDashboardButton />
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              All Assets
+            </h1>
+            <div className="px-4 py-2 rounded-xl bg-primary/10 border-2 border-primary/20 inline-block">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">
+                Total Inventory Value
+              </p>
+              <p className="text-xl font-bold text-primary">
+                SAR {totalInventoryValue.toLocaleString()}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button 
+              onClick={handlePrint} 
+              variant="outline"
+              className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </Button>
+            {isAdmin && !isViewingUser && !isAssigningUser && (
+              <Button 
+                onClick={() => setShowAssetForm(true)} 
+                className="gap-2 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+              >
+                <Plus className="w-4 h-4" />
+                Add
+              </Button>
+            )}
+          </div>
         </div>
-        <Button 
-          onClick={handlePrint} 
-          variant="outline"
-          className="bg-white/60 backdrop-blur-md hover:bg-white/80 w-full sm:w-auto shrink-0"
-        >
-          🖨️ Print
-        </Button>
-      </div>
 
-      {/* Search and Barcode Scanner */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            type="text"
-            placeholder="Search by asset name or serial number..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              // Clear barcode filter when searching
-              if (barcodeFilter) setBarcodeFilter(null);
+        {/* Search and Barcode Scanner */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              type="text"
+              placeholder="Search by asset name or serial number..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                // Clear barcode filter when searching
+                if (barcodeFilter) setBarcodeFilter(null);
+              }}
+              className="pl-10 h-11 border-2 focus:border-primary transition-colors bg-card/80 backdrop-blur-sm"
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsScanningMode(true);
+              setShowBarcodeScanner(false); // Close camera modal if open
+              // Focus will be handled by useEffect
             }}
-            className="pl-10 bg-white/60 backdrop-blur-md"
-          />
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setIsScanningMode(true);
-            setShowBarcodeScanner(false); // Close camera modal if open
-            // Focus will be handled by useEffect
-          }}
-          className={`bg-white/60 backdrop-blur-md hover:bg-white/80 shrink-0 ${isScanningMode ? "ring-2 ring-primary ring-offset-2" : ""}`}
-        >
+            className={`border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 shrink-0 h-11 ${isScanningMode ? "ring-2 ring-primary ring-offset-2" : ""}`}
+          >
           <QrCode className="w-4 h-4 mr-2" />
           {isScanningMode ? "Scanning... (Click to Cancel)" : "Scan Barcode"}
         </Button>
@@ -956,53 +982,65 @@ export default function AllAssetsPage() {
         autoComplete="off"
       />
 
-      <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md -mx-3 sm:mx-0">
-        <Table className="w-full min-w-[900px] sm:min-w-0">
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Asset Name</TableHead>
-              <TableHead>Asset #</TableHead>
-              <TableHead>Total Value</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Station</TableHead>
-              <TableHead>Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredAssets.length === 0 ? (
+      <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+        <div className="overflow-x-auto rounded-lg">
+          <Table className="w-full min-w-[1200px] sm:min-w-0">
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                  {searchQuery || barcodeFilter
-                    ? "No assets found matching your search criteria."
-                    : "No assets available."}
-                </TableCell>
+                <TableHead>ID</TableHead>
+                <TableHead>Asset Name</TableHead>
+                <TableHead>Asset #</TableHead>
+                <TableHead>Total Value</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Assigned to Stations</TableHead>
+                <TableHead>Assigned to Employees</TableHead>
+                <TableHead>Station</TableHead>
+                <TableHead>Action</TableHead>
               </TableRow>
-            ) : (
-              filteredAssets.map((a) => (
-              <TableRow key={a.id} className="hover:bg-white/80 transition">
-                <TableCell>{a.id}</TableCell>
-                <TableCell>{a.asset_name}</TableCell>
-                <TableCell>{a.asset_number}</TableCell>
-                <TableCell>{a.totalValue ?? 0}</TableCell>
-                <TableCell>{a.categoryName ?? "-"}</TableCell>
-                <TableCell>
-                  {(() => {
-                    // Calculate total items from all batches
-                    const totalItems = (a.batches || []).reduce(
-                      (sum: number, batch: any) => sum + (batch.quantity || 0),
-                      0
-                    );
-                    // Get assigned items count
-                    const assignedItems = a.totalAssigned || 0;
-                    // Format as "assigned/total" with zero-padding
-                    const formatNumber = (num: number) => String(num).padStart(2, '0');
-                    return totalItems > 0 
-                      ? `${formatNumber(assignedItems)}/${formatNumber(totalItems)}`
-                      : "—";
-                  })()}
-                </TableCell>
+            </TableHeader>
+            <TableBody>
+              {filteredAssets.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    {searchQuery || barcodeFilter
+                      ? "No assets found matching your search criteria."
+                      : "No assets available."}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredAssets.map((a) => (
+                <TableRow key={a.id} className="hover:bg-card/60 transition">
+                  <TableCell>{a.id}</TableCell>
+                  <TableCell>{a.asset_name}</TableCell>
+                  <TableCell>{a.asset_number}</TableCell>
+                  <TableCell>{a.totalValue ?? 0}</TableCell>
+                  <TableCell>{a.categoryName ?? "-"}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const assignedToStations = (a as any).totalAssignedToStations || 0;
+                      const totalItems = (a.batches || []).reduce(
+                        (sum: number, batch: any) => sum + (batch.quantity || 0),
+                        0
+                      );
+                      const formatNumber = (num: number) => String(num).padStart(2, '0');
+                      return totalItems > 0 
+                        ? `${formatNumber(assignedToStations)}/${formatNumber(totalItems)}`
+                        : "—";
+                    })()}
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const assignedToEmployees = (a as any).totalAssignedToEmployees || 0;
+                      const totalItems = (a.batches || []).reduce(
+                        (sum: number, batch: any) => sum + (batch.quantity || 0),
+                        0
+                      );
+                      const formatNumber = (num: number) => String(num).padStart(2, '0');
+                      return totalItems > 0 
+                        ? `${formatNumber(assignedToEmployees)}/${formatNumber(totalItems)}`
+                        : "—";
+                    })()}
+                  </TableCell>
                 <TableCell>
                   {a.assignments && a.assignments.length > 0 ? (
                     <div className="flex flex-col text-sm text-muted-foreground">
@@ -1021,7 +1059,7 @@ export default function AllAssetsPage() {
                   )}
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -1029,16 +1067,16 @@ export default function AllAssetsPage() {
                         setSelectedAssetForBatches(a);
                         setShowViewBatches(true);
                       }} 
-                      className="text-xs"
+                      className="text-xs whitespace-nowrap"
                       title="View Purchase Batches"
                     >
                       Batches
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => openDetails(a)} className="text-xs">Details</Button>
-                    {canAssign && (
+                    <Button variant="outline" size="sm" onClick={() => openDetails(a)} className="text-xs whitespace-nowrap">Details</Button>
+                    {canAssign && !isViewingUser && (
                       <>
-                    <Button variant="outline" size="sm" onClick={() => openAssign(a)} className="text-xs">Assign</Button>
-                    <Button variant="outline" size="sm" onClick={() => openEmployeeAssign(a)} className="text-xs">Assign to Employee</Button>
+                    <Button variant="outline" size="sm" onClick={() => openAssign(a)} className="text-xs whitespace-nowrap">Assign</Button>
+                    <Button variant="outline" size="sm" onClick={() => openEmployeeAssign(a)} className="text-xs whitespace-nowrap">Assign to Employee</Button>
                       </>
                     )}
                   </div>
@@ -1048,7 +1086,8 @@ export default function AllAssetsPage() {
             )}
           </TableBody>
         </Table>
-      </div>
+        </div>
+      </Card>
 
       {/* Barcode Scanner Modal */}
       <BarcodeScannerModal
@@ -1063,10 +1102,10 @@ export default function AllAssetsPage() {
 
       {/* DETAILS dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto border-2 border-card-border">
           <DialogHeader>
-            <DialogTitle>{editMode ? "Edit Asset" : "Asset Details"}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl font-bold">{editMode ? "Edit Asset" : "Asset Details"}</DialogTitle>
+            <DialogDescription className="text-base">
               {editMode ? "Update asset information and save changes." : "View detailed information about this asset."}
             </DialogDescription>
           </DialogHeader>
@@ -1106,7 +1145,7 @@ export default function AllAssetsPage() {
                                 setSelected({ ...selected, [key]: nextValue });
                               }
                         }
-                      />
+      />
                     </div>
                   );
                 })}
@@ -1123,8 +1162,12 @@ export default function AllAssetsPage() {
                     </>
                   ) : (
                     <>
-                      <Button type="button" variant="outline" onClick={() => setEditMode(false)} className="w-full sm:w-auto">Cancel</Button>
-                      <Button type="button" onClick={saveEdit} className="w-full sm:w-auto">💾 Save</Button>
+                      {isAdmin && !isViewingUser && !isAssigningUser && (
+                        <>
+                          <Button type="button" variant="outline" onClick={() => setEditMode(false)} className="w-full sm:w-auto">Cancel</Button>
+                          <Button type="button" onClick={saveEdit} className="w-full sm:w-auto">💾 Save</Button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -1169,51 +1212,53 @@ export default function AllAssetsPage() {
                             </div>
                           </div>
                           <div className="col-span-1 text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={async () => {
-                                if (!confirm("Are you sure you want to delete this batch? This cannot be undone.")) {
-                                  return;
-                                }
-                                
-                                if (!canDelete) {
-                                  alert("You can only delete batches that haven't been used (remaining quantity equals total quantity).");
-                                  return;
-                                }
-
-                                try {
-                                  const storedToken = localStorage.getItem("auth_token");
-                                  const res = await fetch(`${API_BASE}/api/assets/${selected.id}/batches/${batch.id}`, {
-                                    method: "DELETE",
-                                    headers: {
-                                      ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
-                                    },
-                                    credentials: "include",
-                                  });
-
-                                  if (!res.ok) {
-                                    const errorData = await res.json().catch(() => ({}));
-                                    throw new Error(errorData.message || "Failed to delete batch");
+                            {isAdmin && !isViewingUser && !isAssigningUser && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={async () => {
+                                  if (!confirm("Are you sure you want to delete this batch? This cannot be undone.")) {
+                                    return;
+                                  }
+                                  
+                                  if (!canDelete) {
+                                    alert("You can only delete batches that haven't been used (remaining quantity equals total quantity).");
+                                    return;
                                   }
 
-                                  // Reload assets to refresh the data
-                                  await loadAssets();
-                                  // Update selected asset
-                                  const updatedAsset = assets.find((a) => a.id === selected.id);
-                                  if (updatedAsset) {
-                                    setSelected(updatedAsset);
+                                  try {
+                                    const storedToken = localStorage.getItem("auth_token");
+                                    const res = await fetch(`${API_BASE}/api/assets/${selected.id}/batches/${batch.id}`, {
+                                      method: "DELETE",
+                                      headers: {
+                                        ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+                                      },
+                                      credentials: "include",
+                                    });
+
+                                    if (!res.ok) {
+                                      const errorData = await res.json().catch(() => ({}));
+                                      throw new Error(errorData.message || "Failed to delete batch");
+                                    }
+
+                                    // Reload assets to refresh the data
+                                    await loadAssets();
+                                    // Update selected asset
+                                    const updatedAsset = assets.find((a) => a.id === selected.id);
+                                    if (updatedAsset) {
+                                      setSelected(updatedAsset);
+                                    }
+                                  } catch (err: any) {
+                                    alert(err?.message || "Error deleting batch");
                                   }
-                                } catch (err: any) {
-                                  alert(err?.message || "Error deleting batch");
-                                }
-                              }}
-                              disabled={!canDelete}
-                              title={canDelete ? "Delete batch" : "Cannot delete used batch"}
-                              className="h-8 w-8"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                                }}
+                                disabled={!canDelete}
+                                title={canDelete ? "Delete batch" : "Cannot delete used batch"}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       );
@@ -1228,27 +1273,67 @@ export default function AllAssetsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* ADD ASSET FORM */}
+      <AssetForm
+        open={showAssetForm}
+        onClose={() => setShowAssetForm(false)}
+        onSubmit={async (data: AssetFormData) => {
+          try {
+            const payload = {
+              asset_name: data.asset_name?.trim() || "",
+              asset_number: data.asset_number?.trim() || "",
+              units: data.units ?? null,
+              category_id: data.category_id || null,
+            };
+            const storedToken = localStorage.getItem("auth_token");
+            const res = await fetch(`${API_BASE}/api/assets`, {
+              method: "POST",
+              headers: { 
+                "Content-Type": "application/json",
+                ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+              },
+              credentials: "include",
+              body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const newAsset = await res.json();
+            setAssets((prev) => [newAsset, ...prev]);
+            setShowAssetForm(false);
+            alert("✅ Asset added successfully!");
+          } catch (err: any) {
+            alert(err?.message || "Error adding asset");
+          }
+        }}
+        title="Add Asset"
+      />
+
       {/* ASSIGN dialog */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Assign Asset</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto border-2 border-card-border">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-2xl font-bold">Assign Asset</DialogTitle>
+            <DialogDescription className="text-base">
               Assign assets from specific batches to stations. Each assignment must specify which batch to use.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div className="grid grid-cols-1 gap-6">
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-muted/30 rounded-lg border border-border">
                 <div className="flex-1">
-                  <Label>Station Allocations</Label>
-                  <p className="text-xs text-muted-foreground">
+                  <Label className="text-base font-semibold">Station Allocations</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
                     Assign quantities to one or more Stations/Departments.
                   </p>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={addAssignmentRow} className="shrink-0">
-                  Add Station
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={addAssignmentRow} 
+                  className="shrink-0 border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                >
+                  + Add Station
                 </Button>
               </div>
 
@@ -1260,10 +1345,10 @@ export default function AllAssetsPage() {
 
               {assignmentRows.map((row, index) => {
                 return (
-                  <div key={index} className="space-y-3 p-3 border rounded-lg">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs uppercase tracking-wide">Station/Department</Label>
+                  <div key={index} className="space-y-4 p-5 border-2 border-card-border rounded-xl bg-card/50 backdrop-blur-sm shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="sm:col-span-2">
+                        <Label className="text-sm font-semibold mb-2 block">Station/Department</Label>
                         <Select
                           value={row.pump_id?.toString() ?? "none"}
                           onValueChange={(val) =>
@@ -1272,7 +1357,7 @@ export default function AllAssetsPage() {
                             })
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-11 border-2 focus:border-primary">
                             <SelectValue placeholder="Select Station/Department" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1290,7 +1375,7 @@ export default function AllAssetsPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="text-destructive"
+                          className="text-destructive hover:bg-destructive/10 w-full sm:w-auto"
                           onClick={() => removeAssignmentRow(index)}
                         >
                           Remove Station
@@ -1298,14 +1383,15 @@ export default function AllAssetsPage() {
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-3 pt-3 border-t border-border">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs uppercase tracking-wide">Items ({row.items.length})</Label>
+                        <Label className="text-sm font-semibold">Items ({row.items.length})</Label>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => addItemToAssignment(index, { batch_id: 0, serial_number: "", barcode: "" })}
+                          className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
                         >
                           + Add Item
                         </Button>
@@ -1327,51 +1413,51 @@ export default function AllAssetsPage() {
                         }
                         
                         return (
-                          <div key={itemIndex} className="p-2 border rounded bg-gray-50 space-y-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                                <Label className="text-xs">Batch *</Label>
-                        <Select
+                          <div key={itemIndex} className="p-4 border-2 border-border rounded-lg bg-muted/20 space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="sm:col-span-2">
+                                <Label className="text-sm font-semibold mb-2 block">Batch *</Label>
+                                <Select
                                   value={item.batch_id?.toString() ?? "none"}
-                          onValueChange={(val) =>
+                                  onValueChange={(val) =>
                                     updateItemInAssignment(index, itemIndex, {
                                       batch_id: val === "none" ? 0 : Number(val),
-                            })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Batch" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Select Batch</SelectItem>
-                            {availableBatches.map((batch) => (
-                              <SelectItem key={batch.id} value={batch.id.toString()}>
-                                {batch.batch_name || "Unnamed"} - {new Date(batch.purchase_date).toLocaleDateString()} ({batch.remaining_quantity} available)
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {selectedBatch && (
-                          <p className="text-xs text-muted-foreground mt-1">
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="h-11 border-2 focus:border-primary">
+                                    <SelectValue placeholder="Select Batch" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Select Batch</SelectItem>
+                                    {availableBatches.map((batch) => (
+                                      <SelectItem key={batch.id} value={batch.id.toString()}>
+                                        {batch.batch_name || "Unnamed"} - {new Date(batch.purchase_date).toLocaleDateString()} ({batch.remaining_quantity} available)
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {selectedBatch && (
+                                  <p className="text-xs text-muted-foreground mt-2 px-2 py-1 bg-primary/10 rounded border border-primary/20 inline-block">
                                     {maxAvailable} available
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-end">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive"
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-end">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:bg-destructive/10 w-full sm:w-auto"
                                   onClick={() => removeItemFromAssignment(index, itemIndex)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
+                                >
+                                  Remove
+                                </Button>
+                              </div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
-                                <Label className="text-xs">Serial Number *</Label>
+                                <Label className="text-sm font-semibold mb-2 block">Serial Number *</Label>
                                 <Input
                                   value={item.serial_number || ""}
                                   onChange={(e) =>
@@ -1381,10 +1467,11 @@ export default function AllAssetsPage() {
                                   }
                                   placeholder="Enter serial number"
                                   required
+                                  className="h-11 border-2 focus:border-primary"
                                 />
                               </div>
                               <div>
-                                <Label className="text-xs">Barcode (optional)</Label>
+                                <Label className="text-sm font-semibold mb-2 block">Barcode (optional)</Label>
                                 <Input
                                   value={item.barcode || ""}
                                   onChange={(e) =>
@@ -1393,6 +1480,7 @@ export default function AllAssetsPage() {
                                     })
                                   }
                                   placeholder="Enter barcode"
+                                  className="h-11 border-2 focus:border-primary"
                                 />
                               </div>
                             </div>
@@ -1404,27 +1492,35 @@ export default function AllAssetsPage() {
                 );
               })}
 
-              <div className="text-sm">
-                <span>Total assigned: </span>
-                <span className="font-semibold">{totalAssignedDraft}</span>
-                <span className="ml-3">Remaining: </span>
-                <span
-                  className={`font-semibold ${
-                    remainingDraft < 0 ? "text-destructive" : ""
-                  }`}
-                >
-                  {remainingDraft}
-                </span>
+              <div className="p-4 bg-muted/30 rounded-lg border border-border">
+                <div className="flex flex-wrap items-center gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Total assigned: </span>
+                    <span className="font-semibold text-foreground">{totalAssignedDraft}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Remaining: </span>
+                    <span
+                      className={`font-semibold ${
+                        remainingDraft < 0 ? "text-destructive" : "text-primary"
+                      }`}
+                    >
+                      {remainingDraft}
+                    </span>
+                  </div>
+                </div>
               </div>
               {assignmentError && (
-                <p className="text-sm text-destructive">{assignmentError}</p>
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-sm text-destructive font-medium">{assignmentError}</p>
+                </div>
               )}
             </div>
 
-            <div>
-              <Label>Category</Label>
+            <div className="p-4 bg-muted/30 rounded-lg border border-border">
+              <Label className="text-sm font-semibold mb-2 block">Category</Label>
               <Select value={assignCatId || "none"} onValueChange={setAssignCatId}>
-                <SelectTrigger>
+                <SelectTrigger className="h-11 border-2 focus:border-primary">
                   <SelectValue placeholder="Select Category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1438,11 +1534,19 @@ export default function AllAssetsPage() {
               </Select>
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-2">
-              <Button variant="outline" onClick={() => setAssignOpen(false)} className="w-full sm:w-auto">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-border">
+              <Button 
+                variant="outline" 
+                onClick={() => setAssignOpen(false)} 
+                className="w-full sm:w-auto border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+              >
                 Cancel
               </Button>
-              <Button onClick={saveAssign} disabled={!!assignmentError} className="w-full sm:w-auto">
+              <Button 
+                onClick={saveAssign} 
+                disabled={!!assignmentError} 
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+              >
                 Save
               </Button>
             </div>
@@ -1452,25 +1556,31 @@ export default function AllAssetsPage() {
 
       {/* EMPLOYEE ASSIGN dialog */}
       <Dialog open={employeeAssignOpen} onOpenChange={setEmployeeAssignOpen}>
-        <DialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Assign Asset to Employee</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto border-2 border-card-border">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-2xl font-bold">Assign Asset to Employee</DialogTitle>
+            <DialogDescription className="text-base">
               Assign assets from specific batches to employees. Each assignment must specify which batch to use.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div className="grid grid-cols-1 gap-6">
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-muted/30 rounded-lg border border-border">
                 <div className="flex-1">
-                  <Label>Employee Assignments</Label>
-                  <p className="text-xs text-muted-foreground">
+                  <Label className="text-base font-semibold">Employee Assignments</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
                     Assign quantities to one or more employees.
                   </p>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={addEmployeeAssignmentRow} className="shrink-0">
-                  Add Employee
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={addEmployeeAssignmentRow} 
+                  className="shrink-0 border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                >
+                  + Add Employee
                 </Button>
               </div>
 
@@ -1482,10 +1592,10 @@ export default function AllAssetsPage() {
 
               {employeeAssignmentRows.map((row, index) => {
                 return (
-                  <div key={index} className="space-y-3 p-3 border rounded-lg">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs uppercase tracking-wide">Employee</Label>
+                  <div key={index} className="space-y-4 p-5 border-2 border-card-border rounded-xl bg-card/50 backdrop-blur-sm shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="sm:col-span-1">
+                        <Label className="text-sm font-semibold mb-2 block">Employee</Label>
                         <Select
                           value={row.employee_id?.toString() ?? "none"}
                           onValueChange={(val) =>
@@ -1494,7 +1604,7 @@ export default function AllAssetsPage() {
                             })
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-11 border-2 focus:border-primary">
                             <SelectValue placeholder="Select Employee" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1507,24 +1617,25 @@ export default function AllAssetsPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex items-end gap-2">
-                        <div className="flex-1">
-                          <Label className="text-xs uppercase tracking-wide">Assignment Date</Label>
-                          <Input
-                            type="date"
-                            value={row.assignment_date ?? new Date().toISOString().split("T")[0]}
-                            onChange={(e) =>
-                            updateEmployeeAssignmentRow(index, {
-                                assignment_date: e.target.value,
-                              })
-                            }
-                          />
-                        </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-sm font-semibold mb-2 block">Assignment Date</Label>
+                        <Input
+                          type="date"
+                          value={row.assignment_date ?? new Date().toISOString().split("T")[0]}
+                          onChange={(e) =>
+                          updateEmployeeAssignmentRow(index, {
+                              assignment_date: e.target.value,
+                            })
+                          }
+                          className="h-11 border-2 focus:border-primary"
+                        />
+                      </div>
+                      <div className="flex items-end">
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="text-destructive"
+                          className="text-destructive hover:bg-destructive/10 w-full sm:w-auto"
                           onClick={() => removeEmployeeAssignmentRow(index)}
                         >
                           Remove
@@ -1532,9 +1643,9 @@ export default function AllAssetsPage() {
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-3 pt-3 border-t border-border">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs uppercase tracking-wide">Items ({row.items.length})</Label>
+                        <Label className="text-sm font-semibold">Items ({row.items.length})</Label>
                         <Button
                           type="button"
                           variant="outline"
@@ -1543,6 +1654,7 @@ export default function AllAssetsPage() {
                             const newItems = [...(row.items || []), { batch_id: 0, serial_number: "", barcode: "" }];
                             updateEmployeeAssignmentRow(index, { items: newItems });
                           }}
+                          className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
                         >
                           + Add Item
                         </Button>
@@ -1561,10 +1673,10 @@ export default function AllAssetsPage() {
                           : 0;
                         
                         return (
-                          <div key={itemIndex} className="p-2 border rounded bg-gray-50 space-y-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <div>
-                                <Label className="text-xs">Batch *</Label>
+                          <div key={itemIndex} className="p-4 border-2 border-border rounded-lg bg-muted/20 space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="sm:col-span-2">
+                                <Label className="text-sm font-semibold mb-2 block">Batch *</Label>
                                 <Select
                                   value={item.batch_id?.toString() ?? "none"}
                                   onValueChange={(val) => {
@@ -1573,7 +1685,7 @@ export default function AllAssetsPage() {
                                     updateEmployeeAssignmentRow(index, { items: newItems });
                                   }}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-11 border-2 focus:border-primary">
                             <SelectValue placeholder="Select Batch" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1594,7 +1706,7 @@ export default function AllAssetsPage() {
                           </SelectContent>
                         </Select>
                         {selectedBatch && (
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-2 px-2 py-1 bg-primary/10 rounded border border-primary/20 inline-block">
                                     {employeeRemaining} available for employee assignment (Total: {selectedBatch.quantity}, Assigned to employees: {selectedBatch.employee_assigned_count || 0})
                           </p>
                         )}
@@ -1604,7 +1716,7 @@ export default function AllAssetsPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="text-destructive"
+                          className="text-destructive hover:bg-destructive/10 w-full sm:w-auto"
                                   onClick={() => {
                                     const newItems = row.items.filter((_, idx) => idx !== itemIndex);
                                     updateEmployeeAssignmentRow(index, { items: newItems });
@@ -1614,9 +1726,9 @@ export default function AllAssetsPage() {
                         </Button>
                       </div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
-                                <Label className="text-xs">Serial Number *</Label>
+                                <Label className="text-sm font-semibold mb-2 block">Serial Number *</Label>
                                 <Input
                                   value={item.serial_number || ""}
                                   onChange={(e) => {
@@ -1629,7 +1741,7 @@ export default function AllAssetsPage() {
                                 />
                               </div>
                               <div>
-                                <Label className="text-xs">Barcode (optional)</Label>
+                                <Label className="text-sm font-semibold mb-2 block">Barcode (optional)</Label>
                                 <Input
                                   value={item.barcode || ""}
                                   onChange={(e) => {
@@ -1638,6 +1750,7 @@ export default function AllAssetsPage() {
                                     updateEmployeeAssignmentRow(index, { items: newItems });
                                   }}
                                   placeholder="Enter barcode"
+                                  className="h-11 border-2 focus:border-primary"
                                 />
                               </div>
                             </div>
@@ -1677,6 +1790,7 @@ export default function AllAssetsPage() {
         assetName={selectedAssetForBatches?.asset_name || ""}
         onRefresh={loadAssets}
       />
+      </div>
     </div>
   );
 }

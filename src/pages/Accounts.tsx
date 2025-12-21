@@ -25,6 +25,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
+import { Card } from "@/components/ui/card";
 import { Trash2, Plus } from "lucide-react";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 
@@ -144,29 +145,35 @@ export default function AccountsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
-        <BackToDashboardButton />
-        <div className="w-full sm:w-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold">Account Management</h1>
-          <p className="text-sm text-muted-foreground">
-            Create and manage user accounts with different privileges
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6">
+          <div className="space-y-2">
+            <BackToDashboardButton />
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              Account Management
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Create and manage user accounts with different privileges
+            </p>
+          </div>
+          <Button
+            onClick={() => setOpen(true)}
+            className="w-full sm:w-auto shrink-0 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Account
+          </Button>
         </div>
-        <Button
-          onClick={() => setOpen(true)}
-          className="w-full sm:w-auto shrink-0"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Create Account
-        </Button>
-      </div>
 
-      {loading ? (
-        <div className="text-center py-8 text-muted-foreground">Loading accounts...</div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg shadow-md bg-white/60 backdrop-blur-md">
-          <Table className="w-full">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-muted-foreground text-lg">Loading accounts...</p>
+          </div>
+        ) : (
+          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+            <div className="overflow-x-auto">
+              <Table className="w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
@@ -189,7 +196,13 @@ export default function AccountsPage() {
                     <TableCell>{account.id}</TableCell>
                     <TableCell className="font-medium">{account.username}</TableCell>
                     <TableCell>
-                      <span className="px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-800">
+                      <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                        account.role === "admin" 
+                          ? "bg-primary/20 text-primary border border-primary/30" 
+                          : account.role === "assigning_user"
+                          ? "bg-blue-500/20 text-blue-600 border border-blue-500/30"
+                          : "bg-muted text-muted-foreground border border-border"
+                      }`}>
                         {getRoleDisplay(account.role)}
                       </span>
                     </TableCell>
@@ -211,43 +224,46 @@ export default function AccountsPage() {
               )}
             </TableBody>
           </Table>
-        </div>
-      )}
+            </div>
+          </Card>
+        )}
 
       {/* Create Account Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md border-2 border-card-border">
           <DialogHeader>
-            <DialogTitle>Create New Account</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl font-bold">Create New Account</DialogTitle>
+            <DialogDescription className="text-base">
               Create a new user account with specific privileges
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <Label>Username *</Label>
+              <Label className="text-sm font-semibold">Username *</Label>
               <Input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
+                className="h-11 border-2 focus:border-primary transition-colors mt-2"
               />
             </div>
 
             <div>
-              <Label>Password *</Label>
+              <Label className="text-sm font-semibold">Password *</Label>
               <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password (min 6 characters)"
+                className="h-11 border-2 focus:border-primary transition-colors mt-2"
               />
             </div>
 
             <div>
-              <Label>Role *</Label>
+              <Label className="text-sm font-semibold">Role *</Label>
               <Select value={role} onValueChange={(val: any) => setRole(val)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-11 border-2 focus:border-primary mt-2">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -259,24 +275,36 @@ export default function AccountsPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                <p className="text-sm text-destructive font-medium">{error}</p>
+              </div>
             )}
 
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => {
-                setOpen(false);
-                setError("");
-                setUsername("");
-                setPassword("");
-                setRole("viewing_user");
-              }}>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setOpen(false);
+                  setError("");
+                  setUsername("");
+                  setPassword("");
+                  setRole("viewing_user");
+                }}
+                className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+              >
                 Cancel
               </Button>
-              <Button onClick={handleCreate}>Create Account</Button>
+              <Button 
+                onClick={handleCreate}
+                className="bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+              >
+                Create Account
+              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import BackToDashboardButton from "@/components/BackToDashboardButton";
 type Category = { id: string; name: string };
 
 export default function Categories() {
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isViewingUser, isAssigningUser } = useUserRole();
   const [categories, setCategories] = useState<Category[]>([]);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -87,66 +87,102 @@ export default function Categories() {
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-      <BackToDashboardButton />
-      <h1 className="text-2xl sm:text-3xl font-bold">Categories</h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="space-y-2">
+            <BackToDashboardButton />
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              Categories
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Organize and manage asset categories
+            </p>
+          </div>
+        </div>
 
-      {/* Add Category */}
-      {isAdmin && (
-      <Card>
-        <CardHeader>
-          <CardTitle>Add Category</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col sm:flex-row gap-2">
+        {/* Add Category */}
+        {isAdmin && !isViewingUser && !isAssigningUser && (
+        <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-semibold flex items-center gap-2">
+              <span className="text-2xl">+</span>
+              Add Category
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row gap-3">
           <Input
             placeholder="Category name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="flex-1"
+            className="flex-1 h-11 border-2 focus:border-primary transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addCategory();
+              }
+            }}
           />
-          <Button onClick={addCategory} disabled={loading} className="w-full sm:w-auto shrink-0">
-            {loading ? "Adding..." : "Add"}
+          <Button 
+            onClick={addCategory} 
+            disabled={loading} 
+            className="w-full sm:w-auto shrink-0 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold h-11"
+          >
+            {loading ? "Adding..." : "Add Category"}
           </Button>
         </CardContent>
       </Card>
       )}
 
       {/* All Categories */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Categories</CardTitle>
+      <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl font-semibold">All Categories</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p>Loading...</p>
+            <div className="flex items-center justify-center py-8">
+              <p className="text-muted-foreground">Loading categories...</p>
+            </div>
           ) : error ? (
-            <p className="text-destructive">{error}</p>
+            <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+              <p className="text-destructive font-medium">{error}</p>
+            </div>
           ) : categories.length === 0 ? (
-            <p>No categories yet.</p>
+            <div className="flex items-center justify-center py-12">
+              <p className="text-muted-foreground text-lg">No categories yet. {isAdmin && "Add one above to get started."}</p>
+            </div>
           ) : (
-            <ul className="divide-y">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {categories.map((c) => (
-                <li
+                <div
                   key={c.id}
-                  className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 py-2"
+                  className="group relative p-4 rounded-xl border-2 border-card-border bg-card/60 hover:border-primary/50 hover:bg-card/80 transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
                 >
-                  <span className="break-words flex-1">{c.name}</span>
-                  {isAdmin && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => deleteCategory(c.id)}
-                    className="w-full sm:w-auto shrink-0"
-                  >
-                    Delete
-                  </Button>
-                  )}
-                </li>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-lg mb-1 group-hover:text-primary transition-colors duration-300">
+                        {c.name}
+                      </h3>
+                    </div>
+                    {isAdmin && !isViewingUser && !isAssigningUser && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteCategory(c.id)}
+                        className="shrink-0 shadow-sm hover:shadow-md transition-all duration-300"
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }

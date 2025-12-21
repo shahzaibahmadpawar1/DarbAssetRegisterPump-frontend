@@ -6,6 +6,8 @@ import AssetForm, { type AssetFormData } from "@/components/AssetForm";
 import BarcodeScannerModal from "../components/BarcodeScannerModal";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import PrintAssets from "@/components/PrintAssets";
+import BackToDashboardButton from "@/components/BackToDashboardButton";
+import { useUserRole } from "@/hooks/useUserRole";
 import { ArrowLeft, Plus, Printer, FileDown, RotateCcw, PackagePlus } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import AddBatchModal from "@/components/AddBatchModal";
@@ -17,6 +19,7 @@ interface AssetsProps {
 }
 
 export default function Assets({ pump_id, onBack }: AssetsProps) {
+  const { isAdmin } = useUserRole();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
@@ -187,36 +190,67 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
   }, [assetsForView, pump_id]);
 
   return (
-    <div className="min-h-screen bg-white/80 dark:bg-black/40">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <PrintAssets assets={assetsForView} />
-      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-8 space-y-4 sm:space-y-6 no-print">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8 no-print">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6">
           <div className="flex items-center gap-3 flex-wrap">
-            <Button variant="outline" onClick={onBack} className="gap-2 shrink-0">
-              <ArrowLeft className="w-4 h-4" /> Back
-            </Button>
-            <h1 className="text-2xl sm:text-3xl font-bold">Assets</h1>
+            {pump_id ? (
+              <Button 
+                variant="outline" 
+                onClick={onBack} 
+                className="gap-2 shrink-0 border-2 border-border/50 hover:border-primary/50 bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </Button>
+            ) : (
+              <BackToDashboardButton />
+            )}
+            <div className="space-y-1">
+              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                Assets
+              </h1>
+              <p className="text-muted-foreground text-sm sm:text-base">Complete asset inventory</p>
+            </div>
           </div>
-          <div className="flex flex-col gap-2 sm:items-end w-full sm:w-auto">
-            <div className="text-sm text-black">
-              Total value{" "}
-              <span className="font-semibold">
-                {totalValueForView.toLocaleString()}
-              </span>
+          <div className="flex flex-col gap-3 sm:items-end w-full sm:w-auto">
+            <div className="px-4 py-2 rounded-xl bg-primary/10 border-2 border-primary/20">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">
+                Total Value
+              </div>
+              <div className="text-2xl font-bold text-primary">
+                SAR {totalValueForView.toLocaleString()}
+              </div>
             </div>
             <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => window.print()} className="gap-2 text-xs sm:text-sm">
-              <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print</span>
-            </Button>
-            <Button variant="outline" className="gap-2 text-xs sm:text-sm">
-              <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Export</span>
-            </Button>
-            <Button variant="outline" onClick={() => setShowScanner(true)} className="gap-2 text-xs sm:text-sm">
-              <RotateCcw className="w-4 h-4" /> <span className="hidden sm:inline">Scan</span>
-            </Button>
-            <Button onClick={() => setShowForm(true)} className="gap-2 text-xs sm:text-sm">
-              <Plus className="w-4 h-4" /> Add Asset
-            </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => window.print()} 
+                className="gap-2 border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+              >
+                <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Print</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="gap-2 border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+              >
+                <FileDown className="w-4 h-4" /> <span className="hidden sm:inline">Export</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowScanner(true)} 
+                className="gap-2 border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+              >
+                <RotateCcw className="w-4 h-4" /> <span className="hidden sm:inline">Scan</span>
+              </Button>
+              {isAdmin && (
+                <Button 
+                  onClick={() => setShowForm(true)} 
+                  className="gap-2 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+                >
+                  <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -232,14 +266,19 @@ export default function Assets({ pump_id, onBack }: AssetsProps) {
             assets={assetsForView}
             mode={pump_id == null ? "global" : "station"}
             onEdit={(id) => {
+              if (!isAdmin) return;
               const a = assets.find((x) => x.id === id);
               if (a) {
                 setEditingAsset(a);
                 setShowForm(true);
               }
             }}
-            onDelete={(id) => setDeletingAssetId(id)}
+            onDelete={(id) => {
+              if (!isAdmin) return;
+              setDeletingAssetId(id);
+            }}
             onAddInventory={(id) => {
+              if (!isAdmin) return;
               const a = assets.find((x) => x.id === id);
               if (a) {
                 setSelectedAssetForBatch(a);

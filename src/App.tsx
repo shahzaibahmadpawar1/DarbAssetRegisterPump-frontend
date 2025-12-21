@@ -15,9 +15,9 @@ import AssetsByCategoryReport from "./pages/reports/AssetsByCategory";
 import AllAssetsReport from "./pages/reports/AllAssets";
 import AllStationsReport from "./pages/reports/AllStations";
 import Accounts from "./pages/Accounts";
-import AssetForm, { type AssetFormData } from "./components/AssetForm";
-import PumpForm from "./components/PumpForm";
+import Analytics from "./pages/Analytics";
 import { API_BASE } from "./lib/api";
+import Sidebar from "./components/Sidebar";
 
 type View =
   | "login"
@@ -29,7 +29,8 @@ type View =
   | "r-assets-by-cat"
   | "r-all-assets"
   | "r-all-stations"
-  | "accounts";
+  | "accounts"
+  | "analytics";
 
 function App() {
   const [currentView, setCurrentView] = useState<View>("login");
@@ -37,9 +38,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [selectedPumpId, setSelectedPumpId] = useState<number | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
-
-  const [assetFormOpen, setAssetFormOpen] = useState(false);
-  const [pumpFormOpen, setPumpFormOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // ✅ Restore session when app loads
   useEffect(() => {
@@ -88,10 +87,17 @@ function App() {
             "accounts",
           ];
 
-          // If hash is valid and not login, use it; otherwise default to home
+          // If hash is accounts but user is not admin, redirect to analytics
+          if (hash === "accounts" && data.user.role !== "admin") {
+            setCurrentView("analytics");
+            window.history.replaceState({ view: "analytics" }, "Dashboard", "#analytics");
+            return;
+          }
+
+          // If hash is valid and not login, use it; otherwise default to analytics (main dashboard)
           const view = (hash && validViews.includes(hash as View) && hash !== "login") 
             ? (hash as View) 
-            : (hash === "login" ? "home" : "home"); // If on login page, go to home
+            : (hash === "login" ? "analytics" : "analytics"); // Default to analytics (main dashboard)
           setCurrentView(view);
           // Don't change URL if we're already on the correct view
           if (view !== hash && hash !== "login") {
@@ -131,9 +137,16 @@ function App() {
           ];
           
           if (hash && validViews.includes(hash as View) && hash !== "login") {
-            // Keep them on the page - API calls will verify auth
-            setAuthUser({ username: "user" }); // Temporary user object
-            setCurrentView(hash as View);
+            // Prevent non-admins from accessing accounts page (even if we don't have role yet, redirect to be safe)
+            if (hash === "accounts") {
+              setAuthUser({ username: "user" }); // Temporary user object
+              setCurrentView("analytics");
+              window.history.replaceState({ view: "analytics" }, "Dashboard", "#analytics");
+            } else {
+              // Keep them on the page - API calls will verify auth
+              setAuthUser({ username: "user" }); // Temporary user object
+              setCurrentView(hash as View);
+            }
           } else {
             setAuthUser(null);
             setCurrentView("login");
@@ -173,8 +186,8 @@ function App() {
       } catch (err) {
       setAuthUser({ username });
       }
-      setCurrentView("home");
-      window.history.pushState({ view: "home" }, "Home", "#home");
+      setCurrentView("analytics");
+      window.history.pushState({ view: "analytics" }, "Dashboard", "#analytics");
     } finally {
       setAuthLoading(false);
     }
@@ -201,6 +214,12 @@ function App() {
   };
 
   const navigate = (view: View) => {
+    // Prevent non-admins from accessing accounts page
+    if (view === "accounts" && userRole !== "admin") {
+      setCurrentView("analytics");
+      window.history.pushState({ view: "analytics" }, "Dashboard", "#analytics");
+      return;
+    }
     setCurrentView(view);
     window.history.pushState({ view }, view, `#${view}`);
   };
@@ -213,41 +232,22 @@ function App() {
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
       const view = (e.state && e.state.view) as View;
+      // Prevent non-admins from accessing accounts page
+      if (view === "accounts" && userRole !== "admin") {
+        setCurrentView("analytics");
+        window.history.replaceState({ view: "analytics" }, "Dashboard", "#analytics");
+        return;
+      }
       if (view) setCurrentView(view);
       else {
-        setCurrentView("home");
-        window.history.replaceState({ view: "home" }, "Home", "#home");
+        setCurrentView("analytics");
+        window.history.replaceState({ view: "analytics" }, "Dashboard", "#analytics");
       }
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  }, [userRole]);
 
-  const handleAddAsset = async (data: AssetFormData) => {
-    try {
-      const payload = {
-        asset_name: data.asset_name?.trim() || "",
-        asset_number: data.asset_number?.trim() || "",
-        units: data.units ?? null,
-        category_id: data.category_id || null,
-      };
-      const storedToken = localStorage.getItem("auth_token");
-      const res = await fetch(`${API_BASE}/api/assets`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      alert("✅ Asset added successfully!");
-      setAssetFormOpen(false);
-    } catch (err: any) {
-      alert(err.message || "Error adding asset");
-    }
-  };
 
   // ✅ Loading indicator while checking session
   if (authLoading)
@@ -267,58 +267,58 @@ function App() {
             <Header 
               onLogout={handleLogout} 
               currentView={currentView}
+              userRole={userRole}
+              showMenuButton={true}
+              onMenuClick={() => setSidebarOpen(!sidebarOpen)}
               onNavigate={(view) => {
+                // Prevent non-admins from accessing accounts page
+                if (view === "accounts" && userRole !== "admin") {
+                  setCurrentView("analytics");
+                  window.history.pushState({ view: "analytics" }, "Dashboard", "#analytics");
+                  return;
+                }
                 setCurrentView(view as View);
                 window.history.pushState({ view }, view, `#${view}`);
               }}
             />
 
-            {currentView === "home" && (
-              <HomeDashboard
-                onGoPumps={() => setPumpFormOpen(true)}
-                onGoAssets={() => setAssetFormOpen(true)}
-                onGoAddCategory={() => navigate("categories")}
-                onGoAddEmployee={() => navigate("employees")}
-                onGoEmployees={() => navigate("employees")}
-                onGoReportAssetsByCategory={() => navigate("r-assets-by-cat")}
-                onGoReportAllAssets={() => navigate("r-all-assets")}
-                onGoReportAllStations={() => navigate("r-all-stations")}
+            <div className="flex min-h-[calc(100vh-4rem)] relative">
+              <Sidebar 
+                open={sidebarOpen} 
+                onToggle={() => setSidebarOpen(!sidebarOpen)}
+                onNavigate={(view) => {
+                  // Prevent non-admins from accessing accounts page
+                  if (view === "accounts" && userRole !== "admin") {
+                    setCurrentView("analytics");
+                    window.history.pushState({ view: "analytics" }, "Dashboard", "#analytics");
+                    return;
+                  }
+                  setCurrentView(view as View);
+                  window.history.pushState({ view }, view, `#${view}`);
+                }}
               />
-            )}
 
-            {currentView === "dashboard" && (
-              <Dashboard onViewAssets={handleViewAssets} />
-            )}
+              <div className="flex-1 overflow-auto">
+                {currentView === "dashboard" && (
+                  <Dashboard onViewAssets={handleViewAssets} />
+                )}
 
-            {currentView === "assets" && (
-              <Assets
-                pump_id={selectedPumpId}
-                onBack={() => navigate("dashboard")}
-              />
-            )}
+                {currentView === "assets" && (
+                  <Assets
+                    pump_id={selectedPumpId}
+                    onBack={() => navigate("dashboard")}
+                  />
+                )}
 
-            {currentView === "categories" && <Categories />}
-            {currentView === "employees" && <Employees />}
-            {currentView === "r-assets-by-cat" && <AssetsByCategoryReport />}
-            {currentView === "r-all-assets" && <AllAssetsReport />}
-            {currentView === "r-all-stations" && <AllStationsReport />}
-            {currentView === "accounts" && userRole === "admin" && <Accounts />}
-
-            <AssetForm
-              open={assetFormOpen}
-              onClose={() => setAssetFormOpen(false)}
-              onSubmit={handleAddAsset}
-              title="Add Asset"
-            />
-
-            <PumpForm
-              open={pumpFormOpen}
-              onClose={() => setPumpFormOpen(false)}
-              onSuccess={() => {
-                setPumpFormOpen(false);
-                alert("Petrol Station added!");
-              }}
-            />
+                {currentView === "categories" && <Categories />}
+                {currentView === "employees" && <Employees />}
+                {currentView === "r-assets-by-cat" && <AssetsByCategoryReport />}
+                {currentView === "r-all-assets" && <AllAssetsReport />}
+                {currentView === "r-all-stations" && <AllStationsReport />}
+                {currentView === "accounts" && userRole === "admin" && <Accounts />}
+                {currentView === "analytics" && <Analytics onNavigate={(view) => navigate(view as View)} />}
+              </div>
+            </div>
           </>
         )}
         <Toaster />

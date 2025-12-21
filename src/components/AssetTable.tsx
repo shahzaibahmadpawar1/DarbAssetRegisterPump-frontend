@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Pencil, Trash2, PackagePlus, Eye } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export interface AssetAssignment {
   id: number;
@@ -54,6 +55,7 @@ export default function AssetTable({
   onViewBatches,
   mode = "global",
 }: AssetTableProps) {
+  const { isAdmin } = useUserRole();
   if (assets.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -157,7 +159,7 @@ export default function AssetTable({
                         <Eye className="w-4 h-4" />
                       </Button>
                     )}
-                    {onAddInventory && (
+                    {isAdmin && onAddInventory && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -168,22 +170,26 @@ export default function AssetTable({
                         <PackagePlus className="w-4 h-4" />
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onEdit(asset.id)}
-                      data-testid={`button-edit-asset-${asset.id}`}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onDelete(asset.id)}
-                      data-testid={`button-delete-asset-${asset.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {isAdmin && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onEdit(asset.id)}
+                          data-testid={`button-edit-asset-${asset.id}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDelete(asset.id)}
+                          data-testid={`button-delete-asset-${asset.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

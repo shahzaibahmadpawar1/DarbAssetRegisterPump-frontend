@@ -16,7 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 import AllDepartmentsComponent from "./AllDepartments";
-import { Printer } from "lucide-react";
+import PumpForm, { type PumpFormData } from "@/components/PumpForm";
+import { Printer, Plus } from "lucide-react";
 
 type Pump = {
   id: number;
@@ -61,12 +62,13 @@ type Department = {
 };
 
 export default function AllStationsPage() {
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isViewingUser, isAssigningUser } = useUserRole();
   const [stations, setStations] = useState<Pump[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selected, setSelected] = useState<Pump | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [open, setOpen] = useState(false);
+  const [showPumpForm, setShowPumpForm] = useState(false);
   const [activeTab, setActiveTab] = useState<"stations" | "departments">("stations");
   const [stationAssets, setStationAssets] = useState<StationAsset[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
@@ -276,32 +278,50 @@ export default function AllStationsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <BackToDashboardButton />
-        <h1 className="text-3xl font-bold">All Stations/Departments</h1>
-        <Button 
-          onClick={handlePrint} 
-          variant="outline"
-          className="bg-white/60 backdrop-blur-md hover:bg-white/80"
-        >
-          🖨️ Print
-        </Button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6">
+          <div className="space-y-2">
+            <BackToDashboardButton />
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              All Stations/Departments
+            </h1>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button 
+              onClick={handlePrint} 
+              variant="outline"
+              className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </Button>
+            {isAdmin && !isViewingUser && !isAssigningUser && (
+              <Button 
+                onClick={() => setShowPumpForm(true)} 
+                className="gap-2 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+              >
+                <Plus className="w-4 h-4" />
+                Add
+              </Button>
+            )}
+          </div>
+        </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "stations" | "departments")} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-          <TabsTrigger value="stations">Open Stations</TabsTrigger>
-          <TabsTrigger value="departments">Open Departments</TabsTrigger>
-        </TabsList>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "stations" | "departments")} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm">
+            <TabsTrigger value="stations" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Open Stations</TabsTrigger>
+            <TabsTrigger value="departments" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Open Departments</TabsTrigger>
+          </TabsList>
 
         <TabsContent value="stations">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {stations.map((s) => (
           <Card
             key={s.id}
-            className="bg-white/60 backdrop-blur-md hover:bg-white/80 transition hover:shadow-lg"
+            className="group relative overflow-hidden border-2 border-card-border bg-card/80 backdrop-blur-sm hover:border-primary/50 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
           >
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <CardHeader>
               <div className="flex justify-between items-start">
               <CardTitle className="text-lg">{s.name}</CardTitle>
@@ -354,14 +374,14 @@ export default function AllStationsPage() {
 
       {/* 🧩 Modal for Details/Edit */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto border-2 border-card-border">
           <DialogHeader>
             <div className="flex justify-between items-center">
               <div>
-            <DialogTitle>
+            <DialogTitle className="text-2xl font-bold">
               {editMode ? "Edit Station" : "Station Details"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-base">
               {editMode
                 ? "Update station information below."
                 : "View station details."}
@@ -758,7 +778,7 @@ export default function AllStationsPage() {
               <div className="col-span-2 flex justify-between mt-4">
                 {!editMode ? (
                   <>
-                    {isAdmin && (
+                    {isAdmin && !isViewingUser && !isAssigningUser && (
                   <>
                     <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
                       ✏️ Edit
@@ -775,14 +795,18 @@ export default function AllStationsPage() {
                   </>
                 ) : (
                   <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setEditMode(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="button" onClick={saveEdit}>💾 Save</Button>
+                    {isAdmin && !isViewingUser && !isAssigningUser && (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setEditMode(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="button" onClick={saveEdit}>💾 Save</Button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -790,6 +814,25 @@ export default function AllStationsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <PumpForm
+        open={showPumpForm}
+        onClose={() => setShowPumpForm(false)}
+        onSuccess={async () => {
+          // Refresh stations list
+          try {
+            const res = await fetch(`${API_BASE}/api/pumps`, { credentials: "include" });
+            const data = await res.json();
+            setStations(Array.isArray(data) ? data : []);
+            setShowPumpForm(false);
+            alert("✅ Station/Department added successfully!");
+          } catch (err) {
+            console.error("Error refreshing stations:", err);
+          }
+        }}
+        title="Add Station/Department"
+      />
+      </div>
     </div>
   );
 }

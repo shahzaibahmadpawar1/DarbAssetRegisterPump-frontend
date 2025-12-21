@@ -58,7 +58,7 @@ type DepartmentEmployee = {
 };
 
 export default function AllDepartmentsComponent() {
-  const { canAssign, isAdmin } = useUserRole();
+  const { canAssign, isAdmin, isViewingUser, isAssigningUser } = useUserRole();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selected, setSelected] = useState<Department | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -309,7 +309,7 @@ export default function AllDepartmentsComponent() {
                 >
                   Details
                 </Button>
-                {canAssign && (
+                {canAssign && !isViewingUser && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -327,12 +327,12 @@ export default function AllDepartmentsComponent() {
 
       {/* Details/Edit Modal */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto border-2 border-card-border">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-2xl font-bold">
               {editMode ? "Edit Department" : "Department Details"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-base">
               {editMode
                 ? "Update department information below."
                 : "View department details."}
@@ -404,7 +404,7 @@ export default function AllDepartmentsComponent() {
               <div className="col-span-2 flex justify-between mt-4">
                 {!editMode ? (
                   <>
-                    {isAdmin && (
+                    {isAdmin && !isViewingUser && !isAssigningUser && (
                       <>
                         <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
                           ✏️ Edit
@@ -421,16 +421,20 @@ export default function AllDepartmentsComponent() {
                   </>
                 ) : (
                   <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setEditMode(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="button" onClick={saveEdit}>
-                      💾 Save
-                    </Button>
+                    {isAdmin && !isViewingUser && !isAssigningUser && (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setEditMode(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="button" onClick={saveEdit}>
+                          💾 Save
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -441,12 +445,12 @@ export default function AllDepartmentsComponent() {
 
       {/* Assign Employee Modal */}
       <Dialog open={assignEmployeeOpen} onOpenChange={setAssignEmployeeOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg border-2 border-card-border">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-2xl font-bold">
               Assign Employee to {selectedDepartmentForAssign?.name}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-base">
               Select an employee to assign to this department
             </DialogDescription>
           </DialogHeader>
@@ -550,14 +554,14 @@ export default function AllDepartmentsComponent() {
 
       {/* Employee Details Modal */}
       <Dialog open={employeeDetailsOpen} onOpenChange={setEmployeeDetailsOpen}>
-        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto border-2 border-card-border">
           <DialogHeader>
             <div className="flex justify-between items-center">
               <div>
-                <DialogTitle>
+                <DialogTitle className="text-2xl font-bold">
                   Employee Asset Assignments
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-base">
                   {selectedEmployeeForDetails 
                     ? `Assets assigned to ${selectedEmployeeForDetails.name}${selectedEmployeeForDetails.employee_id ? ` (${selectedEmployeeForDetails.employee_id})` : ""}`
                     : "View employee asset assignments"}
@@ -635,7 +639,7 @@ export default function AllDepartmentsComponent() {
                     win!.document.close();
                     win!.print();
                   }}
-                  className="gap-2"
+                  className="gap-2 border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
                 >
                   <Printer className="w-4 h-4" />
                   Print

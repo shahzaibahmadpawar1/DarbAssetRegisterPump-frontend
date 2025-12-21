@@ -90,43 +90,55 @@ export default function AssetForm({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto border-2 border-card-border">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-2xl font-bold">{title}</DialogTitle>
+          <DialogDescription className="text-base">
             Fill in the asset details. Fields marked optional can be left empty.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(submit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+        <form onSubmit={handleSubmit(submit)} className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-6">
           {/* ✅ Asset Name */}
           <div className="col-span-1 sm:col-span-2">
-            <Label>Asset Name</Label>
-            <Input {...register("asset_name", { required: true })} />
+            <Label className="text-sm font-semibold">Asset Name *</Label>
+            <Input 
+              {...register("asset_name", { required: true })} 
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
+              placeholder="Enter asset name"
+            />
           </div>
 
           {/* ✅ Asset Number */}
           <div className="col-span-1 sm:col-span-1">
-            <Label>Asset Number</Label>
-            <Input {...register("asset_number", { required: true })} />
+            <Label className="text-sm font-semibold">Asset Number *</Label>
+            <Input 
+              {...register("asset_number", { required: true })} 
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
+              placeholder="e.g., AST-2024-001"
+            />
           </div>
 
           {/* ✅ Units */}
           <div className="col-span-1 sm:col-span-1">
-            <Label>Units</Label>
-            <Input {...register("units")} />
+            <Label className="text-sm font-semibold">Units (optional)</Label>
+            <Input 
+              {...register("units")} 
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
+              placeholder="Enter units"
+            />
           </div>
 
           {/* ✅ Category Dropdown */}
           <div className="col-span-1 sm:col-span-1">
-            <Label>Category (optional)</Label>
+            <Label className="text-sm font-semibold">Category (optional)</Label>
             <Select
               value={watch("category_id") || "none"}
               onValueChange={(val) =>
                 setValue("category_id", val === "none" ? null : val)
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-11 border-2 focus:border-primary mt-2">
                 <SelectValue placeholder="Select Category" />
               </SelectTrigger>
               <SelectContent>
@@ -140,11 +152,21 @@ export default function AssetForm({
             </Select>
           </div>
           {/* ✅ Buttons */}
-          <div className="col-span-1 sm:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-3 mt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
+          <div className="col-span-1 sm:col-span-2 flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              className="w-full sm:w-auto border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+            >
               Cancel
             </Button>
-            <Button type="submit" className="w-full sm:w-auto">Save Asset</Button>
+            <Button 
+              type="submit" 
+              className="w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+            >
+              Save Asset
+            </Button>
           </div>
         </form>
       </DialogContent>

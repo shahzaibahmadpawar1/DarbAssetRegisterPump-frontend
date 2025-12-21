@@ -28,8 +28,10 @@ export function useUserRole() {
 
   const canAssign = userRole === "admin" || userRole === "assigning_user";
   const isAdmin = userRole === "admin";
+  const isViewingUser = userRole === "viewing_user";
+  const isAssigningUser = userRole === "assigning_user";
   const canView = userRole !== null; // Any authenticated user can view
 
-  return { userRole, loading, canAssign, isAdmin, canView };
+  return { userRole, loading, canAssign, isAdmin, isViewingUser, isAssigningUser, canView };
 }
 

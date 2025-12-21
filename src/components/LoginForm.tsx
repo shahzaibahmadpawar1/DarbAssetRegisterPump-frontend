@@ -56,48 +56,60 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4 text-center pb-6">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-muted/20">
+      <Card className="w-full max-w-md border-2 border-card-border bg-card/90 backdrop-blur-md shadow-2xl">
+        <CardHeader className="space-y-6 text-center pb-8 pt-8">
           <div className="flex justify-center">
-            <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center">
-              <Fuel className="w-8 h-8 text-primary-foreground" />
+            <div className="w-20 h-20 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <Fuel className="w-10 h-10 text-primary-foreground" />
             </div>
           </div>
-          <div>
-            <CardTitle className="text-2xl font-bold">Darb Station</CardTitle>
-            <CardDescription className="text-base mt-2">
+          <div className="space-y-2">
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              Darb Station
+            </CardTitle>
+            <CardDescription className="text-base font-medium">
               Asset Management System
             </CardDescription>
           </div>
         </CardHeader>
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="pb-8 px-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="text-sm font-semibold">Username</Label>
               <Input
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
+                className="h-11 border-2 focus:border-primary transition-colors"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm font-semibold">Password</Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
+                className="h-11 border-2 focus:border-primary transition-colors"
               />
             </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                <p className="text-sm text-destructive font-medium">{error}</p>
+              </div>
+            )}
 
-            <Button type="submit" className="w-full h-10" disabled={submitting}>
+            <Button 
+              type="submit" 
+              className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-300 font-semibold text-base" 
+              disabled={submitting}
+            >
               {submitting ? "Signing in…" : "Sign In"}
             </Button>
           </form>

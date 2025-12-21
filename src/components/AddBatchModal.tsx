@@ -84,18 +84,18 @@ export default function AddBatchModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md border-2 border-card-border">
         <DialogHeader>
-          <DialogTitle>Add Inventory</DialogTitle>
-          <DialogDescription>
-            Add more units to <strong>{assetName}</strong> at a different purchase price.
+          <DialogTitle className="text-2xl font-bold">Add Inventory</DialogTitle>
+          <DialogDescription className="text-base">
+            Add more units to <strong className="text-foreground">{assetName}</strong> at a different purchase price.
             Serial numbers and barcodes will be collected when assigning individual items.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-6">
           <div>
-            <Label htmlFor="purchase_price">
+            <Label htmlFor="purchase_price" className="text-sm font-semibold">
               Purchase Price (per unit) *
             </Label>
             <Input
@@ -103,75 +103,89 @@ export default function AddBatchModal({
               type="number"
               step="0.01"
               min="0"
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
               {...register("purchase_price", {
                 required: "Purchase price is required",
                 min: { value: 0.01, message: "Price must be greater than 0" },
               })}
             />
             {errors.purchase_price && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.purchase_price.message}
-              </p>
+              <div className="p-2 rounded-lg bg-destructive/10 border border-destructive/20 mt-2">
+                <p className="text-sm text-destructive font-medium">
+                  {errors.purchase_price.message}
+                </p>
+              </div>
             )}
           </div>
 
           <div>
-            <Label htmlFor="quantity">Quantity *</Label>
+            <Label htmlFor="quantity" className="text-sm font-semibold">Quantity *</Label>
             <Input
               id="quantity"
               type="number"
               min="1"
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
               {...register("quantity", {
                 required: "Quantity is required",
                 min: { value: 1, message: "Quantity must be at least 1" },
               })}
             />
             {errors.quantity && (
-              <p className="text-sm text-destructive mt-1">
-                {errors.quantity.message}
-              </p>
+              <div className="p-2 rounded-lg bg-destructive/10 border border-destructive/20 mt-2">
+                <p className="text-sm text-destructive font-medium">
+                  {errors.quantity.message}
+                </p>
+              </div>
             )}
           </div>
 
           <div>
-            <Label htmlFor="batch_name">Batch Name (optional)</Label>
+            <Label htmlFor="batch_name" className="text-sm font-semibold">Batch Name (optional)</Label>
             <Input
               id="batch_name"
               type="text"
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
               {...register("batch_name")}
               placeholder="Enter a name for this batch"
             />
           </div>
 
           <div>
-            <Label htmlFor="purchase_date">Purchase Date</Label>
+            <Label htmlFor="purchase_date" className="text-sm font-semibold">Purchase Date</Label>
             <Input
               id="purchase_date"
               type="date"
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
               {...register("purchase_date")}
             />
           </div>
 
           <div>
-            <Label htmlFor="remarks">Remarks (optional)</Label>
+            <Label htmlFor="remarks" className="text-sm font-semibold">Remarks (optional)</Label>
             <Input
               id="remarks"
               type="text"
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
               {...register("remarks")}
               placeholder="Add notes about this batch"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-6">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={loading}
+              className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading}
+              className="bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+            >
               {loading ? "Adding..." : "Add Inventory"}
             </Button>
           </div>

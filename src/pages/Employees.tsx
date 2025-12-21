@@ -50,7 +50,7 @@ type Employee = {
 type Department = { id: number; name: string; manager: string };
 
 export default function Employees() {
-  const { isAdmin, canAssign } = useUserRole();
+  const { isAdmin, canAssign, isViewingUser, isAssigningUser } = useUserRole();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [name, setName] = useState("");
@@ -310,40 +310,52 @@ export default function Employees() {
 
   // Always render the page, even if loading or error
   return (
-    <div className="min-h-screen bg-white/60 dark:bg-black/40">
-      <div className="max-w-5xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
-        <BackToDashboardButton />
-        <h1 className="text-2xl sm:text-3xl font-bold">Employees</h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8">
+        <div className="space-y-2">
+          <BackToDashboardButton />
+          <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            Employee Management
+          </h1>
+          <p className="text-muted-foreground text-lg">
+            Manage employees and their asset assignments
+          </p>
+        </div>
       
       {/* Add Employee */}
-      {isAdmin && (
-        <Card className="bg-white/60 backdrop-blur-md">
-          <CardHeader>
-            <CardTitle>Add Employee</CardTitle>
+      {isAdmin && !isViewingUser && !isAssigningUser && (
+        <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-semibold flex items-center gap-2">
+              <span className="text-2xl">+</span>
+              Add Employee
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="employee-name">Employee Name <span className="text-destructive">*</span></Label>
+            <Label htmlFor="employee-name" className="text-sm font-semibold">Employee Name <span className="text-destructive">*</span></Label>
             <Input
               id="employee-name"
               placeholder="Enter employee name"
               value={name}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
+              className="h-11 border-2 focus:border-primary transition-colors"
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="employee-id">Employee ID (optional)</Label>
+            <Label htmlFor="employee-id" className="text-sm font-semibold">Employee ID (optional)</Label>
             <Input
               id="employee-id"
               placeholder="Enter employee ID"
               value={employeeId}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmployeeId(e.target.value)}
+              className="h-11 border-2 focus:border-primary transition-colors"
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="department">Department (optional)</Label>
+            <Label htmlFor="department" className="text-sm font-semibold">Department (optional)</Label>
             <Select value={departmentId} onValueChange={setDepartmentId}>
-              <SelectTrigger id="department">
+              <SelectTrigger id="department" className="h-11 border-2 focus:border-primary">
                 <SelectValue placeholder="Select a department" />
               </SelectTrigger>
               <SelectContent>
@@ -357,28 +369,34 @@ export default function Employees() {
             </Select>
           </div>
           {error && !loading && (
-            <p className="text-sm text-destructive">{error}</p>
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+              <p className="text-sm text-destructive font-medium">{error}</p>
+            </div>
           )}
-          <Button onClick={addEmployee} disabled={loading || !name.trim()} className="w-full sm:w-auto">
-            {loading ? "Adding..." : "Add Employee"}
+          <Button 
+            onClick={addEmployee} 
+            disabled={loading || !name.trim()} 
+            className="w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold h-11"
+          >
+            {loading ? "Adding..." : "+ Add Employee"}
           </Button>
         </CardContent>
       </Card>
       )}
 
       {/* All Employees */}
-      <Card className="bg-white/60 backdrop-blur-md">
-        <CardHeader>
-          <CardTitle>All Employees</CardTitle>
+      <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl font-semibold">All Employees</CardTitle>
         </CardHeader>
         <CardContent>
           {/* Search Input */}
-          <div className="mb-4">
+          <div className="mb-6">
             <Input
-              placeholder="Search by employee name or ID..."
+              placeholder="Search employees..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full"
+              className="w-full h-11 border-2 focus:border-primary transition-colors"
             />
           </div>
 
@@ -429,7 +447,7 @@ export default function Employees() {
                       )}
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      {canAssign && (
+                      {canAssign && !isViewingUser && (
                         <>
                           <Button
                             variant="outline"
@@ -450,7 +468,7 @@ export default function Employees() {
                           </Button>
                         </>
                       )}
-                      {isAdmin && (
+                      {isAdmin && !isViewingUser && !isAssigningUser && (
                         <Button
                           variant="destructive"
                           size="sm"

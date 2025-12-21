@@ -49,7 +49,7 @@ export default function ViewBatchesModal({
   assetName,
   onRefresh,
 }: ViewBatchesModalProps) {
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isViewingUser, isAssigningUser } = useUserRole();
   const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -175,20 +175,20 @@ export default function ViewBatchesModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border-2 border-card-border">
         <DialogHeader>
           <div className="flex justify-between items-start">
             <div>
-              <DialogTitle>Purchase Batches - {assetName}</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-2xl font-bold">Purchase Batches - {assetName}</DialogTitle>
+              <DialogDescription className="text-base mt-2">
                 View all purchase batches and their prices for this asset.
               </DialogDescription>
             </div>
-            {isAdmin && (
+            {isAdmin && !isViewingUser && !isAssigningUser && (
               <Button
                 onClick={() => setShowAddBatch(true)}
                 size="sm"
-                className="gap-2"
+                className="gap-2 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
               >
                 <Plus className="w-4 h-4" />
                 Add Batch
@@ -198,41 +198,43 @@ export default function ViewBatchesModal({
         </DialogHeader>
 
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Loading batches...
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground text-lg">Loading batches...</p>
           </div>
         ) : error ? (
-          <div className="text-center py-8 text-red-600">{error}</div>
+          <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+            <p className="text-destructive font-medium">{error}</p>
+          </div>
         ) : batches.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            No purchase batches found for this asset.
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground text-lg">No purchase batches found for this asset.</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="border rounded-lg p-3">
-                <div className="text-xs text-muted-foreground">Total Batches</div>
-                <div className="text-lg font-semibold">{batches.length}</div>
+              <div className="border-2 border-card-border rounded-xl p-4 bg-card/60 backdrop-blur-sm hover:border-primary/50 transition-all duration-300">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">Total Batches</div>
+                <div className="text-2xl font-bold text-primary">{batches.length}</div>
               </div>
-              <div className="border rounded-lg p-3">
-                <div className="text-xs text-muted-foreground">Total Quantity</div>
-                <div className="text-lg font-semibold">{totalQuantity}</div>
+              <div className="border-2 border-card-border rounded-xl p-4 bg-card/60 backdrop-blur-sm hover:border-primary/50 transition-all duration-300">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">Total Quantity</div>
+                <div className="text-2xl font-bold text-foreground">{totalQuantity}</div>
               </div>
-              <div className="border rounded-lg p-3">
-                <div className="text-xs text-muted-foreground">Remaining</div>
-                <div className="text-lg font-semibold">{totalRemaining}</div>
+              <div className="border-2 border-card-border rounded-xl p-4 bg-card/60 backdrop-blur-sm hover:border-primary/50 transition-all duration-300">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">Remaining</div>
+                <div className="text-2xl font-bold text-foreground">{totalRemaining}</div>
               </div>
-              <div className="border rounded-lg p-3">
-                <div className="text-xs text-muted-foreground">Total Value</div>
-                <div className="text-lg font-semibold">
-                  {totalValue.toLocaleString()}
+              <div className="border-2 border-card-border rounded-xl p-4 bg-card/60 backdrop-blur-sm hover:border-primary/50 transition-all duration-300">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">Total Value</div>
+                <div className="text-2xl font-bold text-primary">
+                  ${totalValue.toLocaleString()}
                 </div>
               </div>
             </div>
 
             {/* Batches Table */}
-            <div className="border rounded-md overflow-hidden">
+            <div className="border-2 border-card-border rounded-lg overflow-hidden bg-card/60 backdrop-blur-sm">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -276,7 +278,7 @@ export default function ViewBatchesModal({
                           {remainingValue.toLocaleString()}
                         </TableCell>
                         <TableCell>
-                          {isAdmin && (
+                          {isAdmin && !isViewingUser && !isAssigningUser && (
                             <div className="flex gap-1">
                               <Button
                                 variant="ghost"
@@ -311,25 +313,29 @@ export default function ViewBatchesModal({
             </div>
 
             {/* Footer Summary */}
-            <div className="flex justify-between items-center pt-2 border-t">
-              <div className="text-sm text-muted-foreground">
-                Total Remaining Value:{" "}
-                <span className="font-semibold text-foreground">
-                  {totalRemainingValue.toLocaleString()}
-                </span>
+            <div className="flex justify-between items-center pt-4 border-t-2 border-card-border">
+              <div className="px-4 py-2 rounded-lg bg-primary/10 border border-primary/20">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Total Remaining Value</div>
+                <div className="text-lg font-bold text-primary">
+                  ${totalRemainingValue.toLocaleString()}
+                </div>
               </div>
-              <div className="text-sm text-muted-foreground">
-                Total Used Value:{" "}
-                <span className="font-semibold text-foreground">
-                  {(totalValue - totalRemainingValue).toLocaleString()}
-                </span>
+              <div className="px-4 py-2 rounded-lg bg-muted/50 border border-border">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Total Used Value</div>
+                <div className="text-lg font-bold text-foreground">
+                  ${(totalValue - totalRemainingValue).toLocaleString()}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className="flex justify-end pt-4">
-          <Button variant="outline" onClick={onClose}>
+        <div className="flex justify-end pt-6 border-t-2 border-card-border mt-6">
+          <Button 
+            variant="outline" 
+            onClick={onClose}
+            className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+          >
             Close
           </Button>
         </div>
@@ -353,21 +359,26 @@ export default function ViewBatchesModal({
       {/* Delete Confirmation */}
       {deletingBatchId && (
         <Dialog open={!!deletingBatchId} onOpenChange={() => setDeletingBatchId(null)}>
-          <DialogContent>
+          <DialogContent className="border-2 border-card-border">
             <DialogHeader>
-              <DialogTitle>Delete Batch</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-2xl font-bold">Delete Batch</DialogTitle>
+              <DialogDescription className="text-base">
                 Are you sure you want to delete this batch? This action cannot be undone.
                 You can only delete batches that haven't been used (remaining quantity equals total quantity).
               </DialogDescription>
             </DialogHeader>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setDeletingBatchId(null)}>
+            <div className="flex justify-end gap-3 pt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => setDeletingBatchId(null)}
+                className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+              >
                 Cancel
               </Button>
               <Button
                 variant="destructive"
                 onClick={() => handleDeleteBatch(deletingBatchId)}
+                className="shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
               >
                 Delete
               </Button>
@@ -423,21 +434,26 @@ function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-md border-2 border-card-border">
         <DialogHeader>
-          <DialogTitle>Edit Batch</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-2xl font-bold">Edit Batch</DialogTitle>
+          <DialogDescription className="text-base">
             Update the purchase price, date, or batch name for this batch. Note: Quantity cannot change.
             Serial numbers and barcodes are tracked at the assignment level.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-5 mt-6">
           <div>
-            <Label>Batch Name (optional)</Label>
-            <Input value={batchName} onChange={(e) => setBatchName(e.target.value)} placeholder="Enter a name for this batch" />
+            <Label className="text-sm font-semibold">Batch Name (optional)</Label>
+            <Input 
+              value={batchName} 
+              onChange={(e) => setBatchName(e.target.value)} 
+              placeholder="Enter a name for this batch"
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
+            />
           </div>
           <div>
-            <Label>Purchase Price (per unit) *</Label>
+            <Label className="text-sm font-semibold">Purchase Price (per unit) *</Label>
             <Input
               type="number"
               step="0.01"
@@ -445,25 +461,37 @@ function EditBatchModal({ open, onClose, batch, onSave }: EditBatchModalProps) {
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               required
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
             />
           </div>
           <div>
-            <Label>Purchase Date</Label>
+            <Label className="text-sm font-semibold">Purchase Date</Label>
             <Input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              className="h-11 border-2 focus:border-primary transition-colors mt-2"
             />
           </div>
-          <div className="text-sm text-muted-foreground">
-            <p>Quantity: {batch.quantity} (cannot be changed)</p>
-            <p>Remaining: {batch.remaining_quantity}</p>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-sm font-semibold text-foreground">Quantity: <span className="text-primary">{batch.quantity}</span> (cannot be changed)</p>
+            <p className="text-sm font-semibold text-foreground mt-1">Remaining: <span className="text-primary">{batch.remaining_quantity}</span></p>
           </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex justify-end gap-3 pt-6">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose}
+              className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300"
+            >
               Cancel
             </Button>
-            <Button type="submit">Save Changes</Button>
+            <Button 
+              type="submit"
+              className="bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+            >
+              Save Changes
+            </Button>
           </div>
         </form>
       </DialogContent>
