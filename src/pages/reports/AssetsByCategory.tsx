@@ -9,15 +9,9 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Printer } from "lucide-react";
+import { Printer, Search } from "lucide-react";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 
 type Category = {
@@ -44,6 +38,8 @@ type Asset = {
   categoryName?: string;
   pumpName?: string;
   pump_id?: number | null;
+  employeeName?: string | null;
+  employee_id?: number | null;
   assignmentQuantity?: number;
   assignmentValue?: number;
   quantity?: number | null;
@@ -55,10 +51,10 @@ export default function AssetsByCategoryReport() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [pumps, setPumps] = useState<Pump[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [categoryId, setCategoryId] = useState<string>("all");
-  const [pumpId, setPumpId] = useState<string>("all");
-  const [employeeId, setEmployeeId] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchType, setSearchType] = useState<"station" | "employee" | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [allAssets, setAllAssets] = useState<Asset[]>([]);
 
   // Load categories
   useEffect(() => {
@@ -108,39 +104,95 @@ export default function AssetsByCategoryReport() {
     loadEmployees();
   }, []);
 
-  // Load assets (filtered by category and/or pump)
+  // Load all assets
   useEffect(() => {
     async function loadAssets() {
       try {
-        let url = `${API_BASE}/api/reports/assets-by-category`;
-
-        const params = new URLSearchParams();
-        if (categoryId !== "all") params.append("category_id", categoryId);
-        if (pumpId !== "all") params.append("pump_id", pumpId);
-        if (employeeId !== "all") params.append("employee_id", employeeId);
-
-        if (params.toString()) url += `?${params.toString()}`;
-
-        const res = await fetch(url, { credentials: "include" });
+        const res = await fetch(`${API_BASE}/api/reports/assets-by-category`, { credentials: "include" });
         const data = await res.json();
-        // Trust the API response - backend already handles all filtering
-        setAssets(Array.isArray(data) ? data : []);
+        setAllAssets(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Failed to load assets:", err);
       }
     }
 
     loadAssets();
-  }, [categoryId, pumpId, employeeId]);
+  }, []);
 
-  const selectedPumpName =
-    pumpId === "all"
-      ? "All Stations"
-      : pumps.find((p) => p.id.toString() === pumpId)?.name ?? "Station";
-  const selectedCategoryName =
-    categoryId === "all"
-      ? "All Categories"
-      : categories.find((c) => c.id === categoryId)?.name ?? "Category";
+  // Fetch assets assigned to a specific employee
+  const fetchAssetsByEmployee = async (employeeId: number) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/reports/assets-by-category?employee_id=${employeeId}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      
+      // Enhance assets with employee name
+      const employee = employees.find(e => e.id === employeeId);
+      const enhancedAssets = (Array.isArray(data) ? data : []).map((asset: Asset) => ({
+        ...asset,
+        employeeName: employee?.name || null,
+        employee_id: employeeId,
+      }));
+      
+      setAssets(enhancedAssets);
+    } catch (err) {
+      console.error("Failed to load assets by employee:", err);
+      setAssets([]);
+    }
+  };
+
+  // Filter assets based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setAssets(allAssets);
+      setSearchType(null);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    
+    // Check if search matches a station
+    const matchedStation = pumps.find(p => 
+      p.name.toLowerCase().includes(query)
+    );
+    
+    // Check if search matches an employee
+    const matchedEmployee = employees.find(e => 
+      e.name.toLowerCase().includes(query) ||
+      e.employee_id?.toLowerCase().includes(query)
+    );
+
+    if (matchedStation) {
+      setSearchType("station");
+      // Filter assets by station
+      const filtered = allAssets.filter(a => 
+        a.pump_id === matchedStation.id
+      );
+      setAssets(filtered);
+    } else if (matchedEmployee) {
+      setSearchType("employee");
+      // Fetch and filter assets by employee
+      fetchAssetsByEmployee(matchedEmployee.id);
+    } else {
+      // No match found, show empty or all assets
+      setSearchType(null);
+      setAssets([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, allAssets, pumps, employees]);
+
+  // Determine search context for display
+  const searchContext = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const query = searchQuery.toLowerCase().trim();
+    const matchedStation = pumps.find(p => p.name.toLowerCase().includes(query));
+    const matchedEmployee = employees.find(e => 
+      e.name.toLowerCase().includes(query) || e.employee_id?.toLowerCase().includes(query)
+    );
+    return matchedStation ? { type: "station", name: matchedStation.name } :
+           matchedEmployee ? { type: "employee", name: matchedEmployee.name } : null;
+  }, [searchQuery, pumps, employees]);
 
   // Calculate total value: sum of assignmentValue for each row
   const totalInventoryValue = useMemo(() => {
@@ -171,15 +223,16 @@ export default function AssetsByCategoryReport() {
         </head>
         <body>
           <h1>Assets by Category</h1>
-          <h2>Category: ${selectedCategoryName} | Station: ${selectedPumpName}</h2>
+          <h2>${searchContext ? `${searchContext.type === "station" ? "Station" : "Employee"}: ${searchContext.name}` : "All Assets"}</h2>
           <h2 style="margin-top: 8px; margin-bottom: 16px;">Total Inventory Value: ${totalInventoryValue.toLocaleString()}</h2>
           <table>
             <thead>
               <tr>
                 <th>Asset Name</th>
                 <th>Asset #</th>
-                <th>Category</th>
-                <th>Station</th>
+                ${searchType !== "station" ? "<th>Category</th>" : ""}
+                ${searchType !== "station" && searchType !== "employee" ? "<th>Station</th>" : ""}
+                ${searchType === "employee" ? "<th>Employee</th>" : ""}
                 <th>Assigned Qty</th>
                 <th>Total Value</th>
               </tr>
@@ -191,8 +244,9 @@ export default function AssetsByCategoryReport() {
                   <tr>
                     <td>${a.asset_name ?? ""}</td>
                     <td>${a.asset_number ?? ""}</td>
-                    <td>${a.categoryName ?? "-"}</td>
-                    <td>${a.pumpName ?? "-"}</td>
+                    ${searchType !== "station" ? `<td>${a.categoryName ?? "-"}</td>` : ""}
+                    ${searchType !== "station" && searchType !== "employee" ? `<td>${a.pumpName ?? "-"}</td>` : ""}
+                    ${searchType === "employee" ? `<td>${a.employeeName ?? "-"}</td>` : ""}
                     <td>${a.assignmentQuantity ?? 0}</td>
                     <td>${(a.assignmentValue ?? 0).toFixed(2)}</td>
                   </tr>`
@@ -228,74 +282,36 @@ export default function AssetsByCategoryReport() {
             </div>
           </div>
         </div>
-        {/* Filters */}
+        {/* Search Bar */}
         <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg p-6">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 justify-between">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 flex-1">
-            {/* Category Filter */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
-              <span className="font-semibold text-sm sm:text-base shrink-0">Category:</span>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger className="w-full sm:w-64 h-11 border-2 focus:border-primary">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                type="text"
+                placeholder="Search by station or employee name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-11 border-2 focus:border-primary transition-colors bg-card/80 backdrop-blur-sm"
+              />
+              {searchContext && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Showing results for: <span className="font-semibold text-primary">
+                    {searchContext.type === "station" ? "Station" : "Employee"}: {searchContext.name}
+                  </span>
+                </p>
+              )}
             </div>
-
-            {/* Pump Filter */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
-              <span className="font-semibold text-sm sm:text-base shrink-0">Station/Department:</span>
-              <Select value={pumpId} onValueChange={setPumpId}>
-                <SelectTrigger className="w-full sm:w-64 h-11 border-2 focus:border-primary">
-              <SelectValue placeholder="Select Station/Department" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Stations</SelectItem>
-              {pumps.map((p) => (
-                <SelectItem key={p.id} value={p.id.toString()}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Employee Filter */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
-          <span className="font-semibold text-sm sm:text-base shrink-0">Employee:</span>
-          <Select value={employeeId} onValueChange={setEmployeeId}>
-            <SelectTrigger className="w-full sm:w-64 h-11 border-2 focus:border-primary">
-              <SelectValue placeholder="Select Employee" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Employees</SelectItem>
-              {employees.map((e) => (
-                <SelectItem key={e.id} value={e.id.toString()}>
-                  {e.name} {e.employee_id ? `(${e.employee_id})` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        </div>
-        <Button 
-          variant="outline" 
-          onClick={handlePrint}
-          className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
-        >
-          <Printer className="w-4 h-4 mr-2" />
-          Print
-        </Button>
-        </div>
-      </Card>
+            <Button 
+              variant="outline" 
+              onClick={handlePrint}
+              className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium shrink-0"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </Button>
+          </div>
+        </Card>
 
       {/* Assets Table */}
       <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
@@ -305,8 +321,9 @@ export default function AssetsByCategoryReport() {
           <TableRow>
             <TableHead>Asset Name</TableHead>
             <TableHead>Asset #</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Station</TableHead>
+            {searchType !== "station" && <TableHead>Category</TableHead>}
+            {searchType !== "station" && searchType !== "employee" && <TableHead>Station</TableHead>}
+            {searchType === "employee" && <TableHead>Employee</TableHead>}
             <TableHead>Assigned Qty</TableHead>
             <TableHead>Total Value</TableHead>
           </TableRow>
@@ -316,22 +333,25 @@ export default function AssetsByCategoryReport() {
             {assets.length > 0 ? (
               assets.map((a) => (
                 <TableRow
-                  key={`${a.id}-${a.pump_id || "unassigned"}`}
+                  key={`${a.id}-${a.pump_id || a.employee_id || "unassigned"}`}
                   className="hover:bg-white/80 transition"
                 >
                   <TableCell>{a.asset_name}</TableCell>
                   <TableCell>{a.asset_number}</TableCell>
-                  <TableCell>{a.categoryName ?? "-"}</TableCell>
-                  <TableCell>{a.pumpName ?? "-"}</TableCell>
+                  {searchType !== "station" && <TableCell>{a.categoryName ?? "-"}</TableCell>}
+                  {searchType !== "station" && searchType !== "employee" && <TableCell>{a.pumpName ?? "-"}</TableCell>}
+                  {searchType === "employee" && <TableCell>{a.employeeName ?? "-"}</TableCell>}
                   <TableCell>{a.assignmentQuantity ?? 0}</TableCell>
                   <TableCell>{(a.assignmentValue ?? 0).toFixed(2)}</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500">
-                  {categoryId !== "all" || pumpId !== "all"
-                    ? "No assets found for the selected filters."
+                <TableCell colSpan={searchType === "station" ? 5 : searchType === "employee" ? 6 : 6} className="text-center text-gray-500">
+                  {searchQuery.trim()
+                    ? searchContext 
+                      ? `No assets found for ${searchContext.type === "station" ? "station" : "employee"}: ${searchContext.name}`
+                      : "No matching station or employee found."
                     : "No assets found."}
                 </TableCell>
               </TableRow>

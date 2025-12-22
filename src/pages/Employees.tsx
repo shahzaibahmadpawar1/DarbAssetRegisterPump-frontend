@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
-import { Printer } from "lucide-react";
+import { Printer, History, Upload, FileSpreadsheet } from "lucide-react";
+import * as XLSX from 'xlsx';
 
 type AssetAssignment = {
   asset_id: number;
@@ -64,9 +65,18 @@ export default function Employees() {
   // Transfer assets modal state
   const [transferAssetsOpen, setTransferAssetsOpen] = useState(false);
   const [sourceEmployeeId, setSourceEmployeeId] = useState<string>("");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [assignmentHistory, setAssignmentHistory] = useState<any[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [targetEmployeeId, setTargetEmployeeId] = useState<string>("");
   const [selectedAssignments, setSelectedAssignments] = useState<Set<number>>(new Set());
   const [transferAllAssets, setTransferAllAssets] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   
   // Transfer department modal state
   const [transferDeptOpen, setTransferDeptOpen] = useState(false);
@@ -122,6 +132,28 @@ export default function Employees() {
     }
     loadDepartments();
   }, []);
+
+  // 🟢 Handle URL parameters for navigation from charts - scroll to employee
+  useEffect(() => {
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.split('?')[1] || '');
+    const employeeId = params.get('employeeId');
+    
+    if (employeeId && employees.length > 0) {
+      // Wait a bit for the page to render
+      setTimeout(() => {
+        const element = document.getElementById(`employee-${employeeId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight the element briefly
+          element.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+          }, 2000);
+        }
+      }, 500);
+    }
+  }, [employees]);
 
   // 🟢 Add an employee
   const addEmployee = async () => {
@@ -193,6 +225,194 @@ export default function Employees() {
     setSelectedAssignments(new Set());
     setTransferAllAssets(false);
     setTransferAssetsOpen(true);
+  };
+
+  // 📜 Fetch assignment history
+  const fetchAssignmentHistory = async (batchId: number) => {
+    try {
+      setHistoryLoading(true);
+      setAssignmentHistory([]); // Clear previous history
+      const storedToken = localStorage.getItem("auth_token");
+      const res = await fetch(`${API_BASE}/api/assignments/history?batch_id=${batchId}`, {
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
+      });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Failed to fetch history:", res.status, errorText);
+        setHistoryLoading(false);
+        alert(`Failed to load assignment history: ${res.status === 401 ? "Unauthorized" : errorText}`);
+        return;
+      }
+      
+      const data = await res.json();
+      setAssignmentHistory(data || []);
+      setHistoryLoading(false);
+    } catch (err) {
+      console.error("Failed to fetch history:", err);
+      setHistoryLoading(false);
+      alert("Failed to load assignment history");
+    }
+  };
+
+  // 📥 Handle Excel file import
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv' // .csv
+    ];
+    
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      alert("Please select a valid Excel file (.xlsx, .xls, or .csv)");
+      return;
+    }
+
+    setImportFile(file);
+    setImportErrors([]);
+    setImportPreview([]);
+
+    // Read and preview the file
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+
+        if (jsonData.length < 2) {
+          alert("Excel file must have at least a header row and one data row");
+          return;
+        }
+
+        // Parse header row
+        const headers = jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
+        
+        // Find column indices
+        const nameIndex = headers.findIndex(h => 
+          h.includes('name') || h.includes('employee name') || h.includes('full name')
+        );
+        const idIndex = headers.findIndex(h => 
+          h.includes('id') || h.includes('employee id') || h.includes('emp id')
+        );
+        const deptIndex = headers.findIndex(h => 
+          h.includes('department') || h.includes('dept')
+        );
+
+        if (nameIndex === -1) {
+          alert("Excel file must have a 'Name' column (or similar: Employee Name, Full Name)");
+          return;
+        }
+
+        // Parse data rows
+        const preview: any[] = [];
+        const errors: string[] = [];
+
+        for (let i = 1; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          const rowNum = i + 1;
+
+          if (!row || row.length === 0) continue; // Skip empty rows
+
+          const name = row[nameIndex] ? String(row[nameIndex]).trim() : '';
+          const employeeId = row[idIndex] ? String(row[idIndex]).trim() : null;
+          const deptName = row[deptIndex] ? String(row[deptIndex]).trim() : null;
+
+          if (!name) {
+            errors.push(`Row ${rowNum}: Name is required`);
+            continue;
+          }
+
+          // Find department ID by name
+          let departmentId = null;
+          if (deptName) {
+            const dept = departments.find(d => 
+              d.name.toLowerCase() === deptName.toLowerCase()
+            );
+            if (dept) {
+              departmentId = dept.id;
+            } else {
+              errors.push(`Row ${rowNum}: Department "${deptName}" not found`);
+            }
+          }
+
+          preview.push({
+            name,
+            employee_id: employeeId,
+            department_id: departmentId,
+            department_name: deptName,
+          });
+        }
+
+        setImportPreview(preview);
+        setImportErrors(errors);
+      } catch (error) {
+        console.error("Error reading Excel file:", error);
+        alert("Failed to read Excel file. Please ensure it's a valid Excel file.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // 📥 Import employees from preview
+  const handleImportEmployees = async () => {
+    if (importPreview.length === 0) {
+      alert("No valid employees to import");
+      return;
+    }
+
+    try {
+      setImportLoading(true);
+      const storedToken = localStorage.getItem("auth_token");
+      
+      const employeesToImport = importPreview.map(emp => ({
+        name: emp.name,
+        employee_id: emp.employee_id || null,
+        department_id: emp.department_id || null,
+      }));
+
+      const res = await fetch(`${API_BASE}/api/employees/bulk`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({ employees: employeesToImport }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(`Failed to import employees: ${errorData.message || errorData.errors?.join(', ') || 'Unknown error'}`);
+        return;
+      }
+
+      const data = await res.json();
+      alert(`✅ Successfully imported ${data.count} employee(s)!`);
+      
+      // Reset and close
+      setImportFile(null);
+      setImportPreview([]);
+      setImportErrors([]);
+      setImportOpen(false);
+      
+      // Reload employees
+      loadEmployees();
+    } catch (err) {
+      console.error("Import error:", err);
+      alert("Failed to import employees");
+    } finally {
+      setImportLoading(false);
+    }
   };
 
   // 🔄 Transfer assets between employees
@@ -373,13 +593,25 @@ export default function Employees() {
               <p className="text-sm text-destructive font-medium">{error}</p>
             </div>
           )}
-          <Button 
-            onClick={addEmployee} 
-            disabled={loading || !name.trim()} 
-            className="w-full sm:w-auto bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold h-11"
-          >
-            {loading ? "Adding..." : "+ Add Employee"}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              onClick={addEmployee} 
+              disabled={loading || !name.trim()} 
+              className="flex-1 sm:flex-initial bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold h-11"
+            >
+              {loading ? "Adding..." : "+ Add Employee"}
+            </Button>
+            {isAdmin && (
+              <Button 
+                onClick={() => setImportOpen(true)} 
+                variant="outline"
+                className="flex-1 sm:flex-initial border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium h-11"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Import from Excel
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
       )}
@@ -430,6 +662,7 @@ export default function Employees() {
                 {filteredEmployees.map((e) => (
                 <li
                   key={e.id}
+                  id={`employee-${e.id}`}
                   className="flex flex-col gap-3 py-4"
                 >
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -596,6 +829,19 @@ export default function Employees() {
                                               Assigned: {new Date(item.assignment_date).toLocaleDateString()}
                                             </span>
                                           )}
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-5 px-2 text-xs"
+                                            onClick={async () => {
+                                              setSelectedBatchId(batch.batch_id);
+                                              await fetchAssignmentHistory(batch.batch_id);
+                                              setHistoryOpen(true);
+                                            }}
+                                          >
+                                            <History className="w-3 h-3 mr-1" />
+                                            History
+                                          </Button>
                                         </div>
                                       ))}
                                     </div>
@@ -803,6 +1049,263 @@ export default function Employees() {
                 disabled={!transferEmployeeId || loading}
               >
                 {loading ? "Transferring..." : "Transfer Employee"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assignment History Modal */}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>Assignment History</DialogTitle>
+                <DialogDescription>
+                  Complete transfer history for this asset batch
+                </DialogDescription>
+              </div>
+              {assignmentHistory.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const assetName = assignmentHistory[0]?.batch?.asset?.asset_name || "Asset";
+                    const assetNumber = assignmentHistory[0]?.batch?.asset?.asset_number || "";
+                    const batchName = assignmentHistory[0]?.batch?.batch_name || `Batch #${selectedBatchId}`;
+                    
+                    const html = `
+                      <html>
+                        <head>
+                          <title>Assignment History - ${assetName}</title>
+                          <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; background: #fff; }
+                            h1 { text-align: center; color: #333; margin-bottom: 8px; }
+                            h2 { text-align: center; font-size: 14px; color: #555; margin-top: 4px; margin-bottom: 20px; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 13px; }
+                            th { background: #f5f5f5; font-weight: bold; }
+                            tr:nth-child(even) { background: #fafafa; }
+                            .current { background: #fff3e0 !important; border: 2px solid #f97316; }
+                            .status { font-weight: bold; color: #f97316; }
+                          </style>
+                        </head>
+                        <body>
+                          <h1>Assignment History</h1>
+                          <h2>Asset: ${assetName} ${assetNumber ? `(${assetNumber})` : ""} | Batch: ${batchName}</h2>
+                          <h2 style="margin-top: 8px; margin-bottom: 16px;">Report Date: ${new Date().toLocaleDateString()}</h2>
+                          <table>
+                            <thead>
+                              <tr>
+                                <th>#</th>
+                                <th>Employee Name</th>
+                                <th>Employee ID</th>
+                                <th>Assignment Date</th>
+                                <th>Assignment Time</th>
+                                <th>Serial Number</th>
+                                <th>Barcode</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              ${assignmentHistory.map((entry, idx) => {
+                                const date = new Date(entry.assignment_date);
+                                return `
+                                  <tr class="${entry.is_active ? 'current' : ''}">
+                                    <td>${idx + 1}</td>
+                                    <td>${entry.employee?.name || "Unknown Employee"}</td>
+                                    <td>${entry.employee?.employee_id || "—"}</td>
+                                    <td>${date.toLocaleDateString()}</td>
+                                    <td>${date.toLocaleTimeString()}</td>
+                                    <td>${entry.serial_number || "—"}</td>
+                                    <td>${entry.barcode || "—"}</td>
+                                    <td class="status">${entry.is_active ? "Current Assignment" : "Previous Assignment"}</td>
+                                  </tr>
+                                `;
+                              }).join("")}
+                            </tbody>
+                          </table>
+                        </body>
+                      </html>
+                    `;
+                    const printWindow = window.open("", "_blank");
+                    if (printWindow) {
+                      printWindow.document.write(html);
+                      printWindow.document.close();
+                      printWindow.print();
+                    }
+                  }}
+                  className="gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {historyLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                <p className="text-muted-foreground">Loading history...</p>
+              </div>
+            ) : assignmentHistory.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No history available</p>
+            ) : (
+              assignmentHistory.map((entry, idx) => (
+                <Card key={entry.id} className={entry.is_active ? "border-primary border-2" : ""}>
+                  <CardContent className="pt-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold">
+                            {entry.employee?.name || "Unknown Employee"}
+                          </span>
+                          {entry.employee?.employee_id && (
+                            <span className="text-sm text-muted-foreground">
+                              ({entry.employee.employee_id})
+                            </span>
+                          )}
+                          {entry.is_active && (
+                            <span className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded font-medium">
+                              Current Assignment
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Assigned: {new Date(entry.assignment_date).toLocaleDateString()} at {new Date(entry.assignment_date).toLocaleTimeString()}
+                        </p>
+                        {entry.serial_number && (
+                          <p className="text-xs text-muted-foreground">
+                            Serial: {entry.serial_number}
+                          </p>
+                        )}
+                        {entry.barcode && (
+                          <p className="text-xs text-muted-foreground">
+                            Barcode: {entry.barcode}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">
+                          {idx === 0 ? "Latest" : `Transfer #${idx + 1}`}
+                        </p>
+                        {entry.batch?.asset && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {entry.batch.asset.asset_name}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Employees Modal */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Employees from Excel</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file (.xlsx, .xls, or .csv) with employee data. 
+              Required columns: Name, Employee ID (optional), Department (optional)
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* File Upload */}
+            <div>
+              <Label htmlFor="excel-file" className="text-sm font-semibold mb-2 block">
+                Select Excel File
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="excel-file"
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileSelect}
+                  className="flex-1"
+                />
+                {importFile && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>{importFile.name}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Excel format: Column A = Name (required), Column B = Employee ID (optional), Column C = Department (optional)
+              </p>
+            </div>
+
+            {/* Errors */}
+            {importErrors.length > 0 && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                <p className="text-sm font-semibold text-destructive mb-1">Validation Errors:</p>
+                <ul className="text-xs text-destructive list-disc list-inside space-y-1">
+                  {importErrors.map((error, idx) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Preview */}
+            {importPreview.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">
+                    Preview ({importPreview.length} employee(s) ready to import)
+                  </Label>
+                </div>
+                <div className="border rounded-lg max-h-64 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        <th className="p-2 text-left border-b">Name</th>
+                        <th className="p-2 text-left border-b">Employee ID</th>
+                        <th className="p-2 text-left border-b">Department</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.map((emp, idx) => (
+                        <tr key={idx} className="border-b">
+                          <td className="p-2">{emp.name}</td>
+                          <td className="p-2">{emp.employee_id || "—"}</td>
+                          <td className="p-2">{emp.department_name || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setImportOpen(false);
+                  setImportFile(null);
+                  setImportPreview([]);
+                  setImportErrors([]);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleImportEmployees}
+                disabled={importLoading || importPreview.length === 0}
+                className="bg-primary hover:bg-primary/90"
+              >
+                {importLoading ? "Importing..." : `Import ${importPreview.length} Employee(s)`}
               </Button>
             </div>
           </div>

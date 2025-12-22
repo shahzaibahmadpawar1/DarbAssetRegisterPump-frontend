@@ -56,12 +56,14 @@ function App() {
             headers: {
               "Authorization": `Bearer ${storedToken}`,
             },
+            cache: "no-store", // Prevent caching
           });
         } else {
           // Try cookie
           res = await fetch(`${API_BASE}/api/me`, { 
             credentials: "include",
             method: "GET",
+            cache: "no-store", // Prevent caching
           });
         }
         
@@ -69,6 +71,8 @@ function App() {
 
         if (data?.authenticated && data?.user) {
           // User is authenticated - restore their session
+          // Always use fresh data from API (don't trust cached state)
+          console.log("[RESTORE SESSION] User authenticated:", { username: data.user.username, role: data.user.role });
           setAuthUser(data.user);
           setUserRole(data.user.role);
 
@@ -169,22 +173,38 @@ function App() {
   const handleLogin = async (username: string, _password: string) => {
     try {
       setAuthLoading(true);
-      // Fetch user role after login
+      
+      // Small delay to ensure cookie is set on server
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Fetch user role after login - always use fresh token from localStorage
       try {
         const storedToken = localStorage.getItem("auth_token");
+        if (!storedToken) {
+          console.warn("[LOGIN] No token in localStorage after login");
+          setAuthUser({ username });
+          setCurrentView("analytics");
+          window.history.pushState({ view: "analytics" }, "Dashboard", "#analytics");
+          return;
+        }
+        
         const res = await fetch(`${API_BASE}/api/me`, {
           credentials: "include",
-          headers: storedToken ? { "Authorization": `Bearer ${storedToken}` } : {},
+          headers: { "Authorization": `Bearer ${storedToken}` },
+          cache: "no-store", // Prevent caching
         });
         const data = await res.json();
         if (data?.authenticated && data?.user) {
+          console.log("[LOGIN] User authenticated:", { username: data.user.username, role: data.user.role });
           setAuthUser(data.user);
           setUserRole(data.user.role);
         } else {
+          console.warn("[LOGIN] Authentication failed, using username only");
           setAuthUser({ username });
         }
       } catch (err) {
-      setAuthUser({ username });
+        console.error("[LOGIN] Error fetching user data:", err);
+        setAuthUser({ username });
       }
       setCurrentView("analytics");
       window.history.pushState({ view: "analytics" }, "Dashboard", "#analytics");
@@ -196,14 +216,26 @@ function App() {
   // ✅ Handle logout
   const handleLogout = async () => {
     try {
+      // Clear localStorage first
+      localStorage.removeItem("auth_token");
+      
+      // Clear state immediately
+      setAuthUser(null);
+      setUserRole(null);
+      setCurrentView("login");
+      setSelectedPumpId(null);
+      
+      // Then call logout endpoint to clear server-side cookie
       await fetch(`${API_BASE}/api/logout`, {
         method: "POST",
         credentials: "include",
       });
+      
+      // Navigate to login
+      window.history.pushState({ view: "login" }, "Login", "#login");
     } catch (e) {
       console.warn("Logout failed", e);
-    } finally {
-      // Clear localStorage token
+      // Even if logout fails, clear local state and navigate to login
       localStorage.removeItem("auth_token");
       setAuthUser(null);
       setUserRole(null);

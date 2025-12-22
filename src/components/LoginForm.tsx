@@ -29,6 +29,9 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
     setSubmitting(true);
 
     try {
+      // Clear any existing tokens before logging in
+      localStorage.removeItem("auth_token");
+      
       const response = await fetch(`${API_BASE}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,7 +45,7 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
         throw new Error(data.message || "Invalid credentials");
       }
 
-      // Store token in localStorage for persistence
+      // Store new token in localStorage for persistence
       if (data.token) {
         localStorage.setItem("auth_token", data.token);
       }

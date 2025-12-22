@@ -368,6 +368,22 @@ export default function AllAssetsPage() {
     loadAssets();
   }, []);
 
+  // 🟢 Handle URL parameters for navigation from charts
+  useEffect(() => {
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.split('?')[1] || '');
+    const assetId = params.get('assetId');
+    
+    if (assetId && assets.length > 0) {
+      const asset = assets.find(a => a.id === Number(assetId));
+      if (asset) {
+        setSelected(asset);
+        setEditMode(false);
+        setOpen(true);
+      }
+    }
+  }, [assets]);
+
   // Focus hidden input when scanning mode is enabled
   useEffect(() => {
     if (isScanningMode && barcodeInputRef.current) {

@@ -101,6 +101,39 @@ export default function AllStationsPage() {
     fetchDepartments();
   }, []);
 
+  // 🟢 Handle URL parameters for navigation from charts
+  useEffect(() => {
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.split('?')[1] || '');
+    
+    // Check for department ID
+    const deptId = params.get('deptId');
+    if (deptId && departments.length > 0) {
+      const dept = departments.find(d => d.id === Number(deptId));
+      if (dept) {
+        setActiveTab("departments");
+        // Department details will be handled by AllDepartmentsComponent
+      }
+    }
+    
+    // Check for tab parameter
+    const tab = params.get('tab');
+    if (tab === 'departments') {
+      setActiveTab("departments");
+    }
+    
+    // Check for station ID
+    const stationId = params.get('stationId');
+    if (stationId && stations.length > 0) {
+      const station = stations.find(s => s.id === Number(stationId));
+      if (station) {
+        setActiveTab("stations");
+        openDetails(station);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stations, departments]);
+
   // 🟢 Open modal for details/edit
   const openDetails = async (pump: Pump) => {
     setSelected(pump);

@@ -4,14 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Package, DollarSign, Users, Building2, TrendingUp } from "lucide-react";
+import { Package, Users, Building2, TrendingUp } from "lucide-react";
 
 interface AnalyticsData {
   totalAssets: number;
   totalBatchItems: number; // Total items in all batches
   totalAssignedItems: number; // Total items assigned (with serial numbers)
   totalValue: number;
-  totalEmployees: number;
+  totalAssignedValue: number; // Total value of assigned assets (station + employee)
+  totalStationAssignedValue: number; // Total value assigned to stations
+  totalEmployeeAssignedValue: number; // Total value assigned to employees
+  totalStations: number;
   topStationsByValue: Array<{ name: string; value: number }>;
   topStationsByItems: Array<{ name: string; items: number }>;
   topEmployeesByValue: Array<{ name: string; value: number; employee_id?: string }>;
@@ -80,6 +83,55 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
     }
   };
 
+  // Handle chart clicks
+  const handleStationClick = (stationName: string, stationId?: number) => {
+    if (stationName.includes("Others")) {
+      // Navigate to all stations page
+      handleNavigate("r-all-stations");
+      window.history.pushState({ view: "r-all-stations" }, "All Stations", "#r-all-stations");
+    } else if (stationId) {
+      // Navigate to station details with ID in URL hash
+      handleNavigate("r-all-stations");
+      window.history.pushState({ view: "r-all-stations", stationId }, "All Stations", `#r-all-stations?stationId=${stationId}`);
+    }
+  };
+
+  const handleDepartmentClick = (deptName: string, deptId?: number) => {
+    if (deptName.includes("Others")) {
+      // Navigate to all stations page with departments tab
+      handleNavigate("r-all-stations");
+      window.history.pushState({ view: "r-all-stations", tab: "departments" }, "All Stations", "#r-all-stations?tab=departments");
+    } else if (deptId) {
+      // Navigate to department details with ID in URL hash
+      handleNavigate("r-all-stations");
+      window.history.pushState({ view: "r-all-stations", tab: "departments", deptId }, "All Stations", `#r-all-stations?tab=departments&deptId=${deptId}`);
+    }
+  };
+
+  const handleEmployeeClick = (employeeName: string, employeeId?: number) => {
+    if (employeeName.includes("Others")) {
+      // Navigate to all employees page
+      handleNavigate("employees");
+      window.history.pushState({ view: "employees" }, "Employees", "#employees");
+    } else if (employeeId) {
+      // Navigate to employees page with scroll to employee
+      handleNavigate("employees");
+      window.history.pushState({ view: "employees", employeeId }, "Employees", `#employees?employeeId=${employeeId}`);
+    }
+  };
+
+  const handleAssetClick = (assetName: string, assetId?: number) => {
+    if (assetName.includes("Others")) {
+      // Navigate to all assets page
+      handleNavigate("r-all-assets");
+      window.history.pushState({ view: "r-all-assets" }, "All Assets", "#r-all-assets");
+    } else if (assetId) {
+      // Navigate to asset details with ID in URL hash
+      handleNavigate("r-all-assets");
+      window.history.pushState({ view: "r-all-assets", assetId }, "All Assets", `#r-all-assets?assetId=${assetId}`);
+    }
+  };
+
   useEffect(() => {
     loadAnalytics();
   }, []);
@@ -107,7 +159,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
       // Calculate metrics
       const totalAssets = assets?.length || 0;
       const totalValue = assets?.reduce((sum: number, asset: any) => sum + (asset.totalValue || 0), 0) || 0;
-      const totalEmployees = employees?.length || 0;
+      const totalStations = pumps?.length || 0;
 
       // Calculate total items in all batches
       const totalBatchItems = assets?.reduce((sum: number, asset: any) => {
@@ -178,6 +230,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
           return {
             name: pump?.name || `Station #${pumpId}`,
             value: Math.round(value),
+            id: pumpId,
           };
         })
         .sort((a, b) => b.value - a.value);
@@ -188,6 +241,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
           return {
             name: pump?.name || `Station #${pumpId}`,
             items: items,
+            id: pumpId,
           };
         })
         .sort((a, b) => b.items - a.items);
@@ -236,6 +290,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
           return {
             name: emp?.name || `Employee #${empId}`,
             value: Math.round(value),
+            id: empId,
             employee_id: emp?.employee_id || undefined,
           };
         })
@@ -247,10 +302,20 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
           return {
             name: emp?.name || `Employee #${empId}`,
             items: items,
+            id: empId,
             employee_id: emp?.employee_id || undefined,
           };
         })
         .sort((a, b) => b.items - a.items);
+
+      // Calculate total assigned values
+      const totalStationAssignedValue = Array.from(stationValueMap.values())
+        .reduce((sum, value) => sum + value, 0);
+      
+      const totalEmployeeAssignedValue = Array.from(employeeValueMap.values())
+        .reduce((sum, value) => sum + value, 0);
+      
+      const totalAssignedValue = totalStationAssignedValue + totalEmployeeAssignedValue;
 
       // Top Assets by Items and Value
       const topAssetsByItems = assets?.map((asset: any) => {
@@ -260,6 +325,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
         return {
           name: asset.asset_name || `Asset #${asset.id}`,
           items: totalItems,
+          id: asset.id,
         };
       })
       .filter((a: any) => a.items > 0)
@@ -269,6 +335,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
       const topAssetsByValue = assets?.map((asset: any) => ({
         name: asset.asset_name || `Asset #${asset.id}`,
         value: Math.round(asset.totalValue || 0),
+        id: asset.id,
       }))
       .filter((a: any) => a.value > 0)
       .sort((a: any, b: any) => b.value - a.value)
@@ -290,12 +357,14 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
       const departmentValue = departments?.map((dept: any) => ({
         name: dept.name,
         value: Math.round(dept.totalAssetValue || 0),
+        id: dept.id,
       })).sort((a: any, b: any) => b.value - a.value) || [];
 
       // Department Employee Count
       const departmentEmployeeCount = departments?.map((dept: any) => ({
         name: dept.name,
         count: dept.employeeCount || 0,
+        id: dept.id,
       })).sort((a: any, b: any) => b.count - a.count) || [];
 
       setData({
@@ -303,7 +372,10 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
         totalBatchItems,
         totalAssignedItems,
         totalValue,
-        totalEmployees,
+        totalAssignedValue,
+        totalStationAssignedValue,
+        totalEmployeeAssignedValue,
+        totalStations,
         topStationsByValue,
         topStationsByItems,
         topEmployeesByValue,
@@ -381,7 +453,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
             </div>
 
         {/* Key Metrics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Assets</CardTitle>
@@ -390,12 +462,20 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {data.totalAssets.toLocaleString()}({data.totalBatchItems.toLocaleString()},{data.totalAssignedItems.toLocaleString()})
+              <div className="space-y-1">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Assets = </span>
+                  <span className="font-bold text-lg">{data.totalAssets.toLocaleString()}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Items = </span>
+                  <span className="font-bold text-lg">{data.totalBatchItems.toLocaleString()}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Assigned Items = </span>
+                  <span className="font-bold text-lg">{data.totalAssignedItems.toLocaleString()}</span>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Assets (Total Items, Assigned)
-              </p>
             </CardContent>
           </Card>
 
@@ -403,7 +483,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Value (SAR)</CardTitle>
               <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-primary" />
+                <span className="text-primary font-bold text-sm">SAR</span>
               </div>
             </CardHeader>
             <CardContent>
@@ -413,13 +493,37 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
 
           <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Employees</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Assigned Value (SAR)</CardTitle>
               <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Users className="h-5 w-5 text-primary" />
+                <span className="text-primary font-bold text-sm">SAR</span>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{data.totalEmployees.toLocaleString()}</div>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold">SAR {formatCurrency(data.totalAssignedValue)}</div>
+                <div className="text-sm pt-2 space-y-1">
+                  <div>
+                    <span className="text-muted-foreground">Assigned to Station = </span>
+                    <span className="font-semibold">SAR {formatCurrency(data.totalStationAssignedValue)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Assigned to Employee = </span>
+                    <span className="font-semibold">SAR {formatCurrency(data.totalEmployeeAssignedValue)}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Stations</CardTitle>
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-primary" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{data.totalStations.toLocaleString()}</div>
             </CardContent>
           </Card>
         </div>
@@ -499,7 +603,16 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
                               );
                             }}
                           />
-                          <Bar dataKey="value" fill="#F97316" radius={[0, 8, 8, 0]} />
+                          <Bar 
+                            dataKey="value" 
+                            fill="#F97316" 
+                            radius={[0, 8, 8, 0]}
+                            onClick={(data: any, index: number, e: any) => {
+                              const payload = data.payload || data;
+                              handleStationClick(payload.name, payload.id);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     );
@@ -559,7 +672,16 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
                               );
                             }}
                           />
-                          <Bar dataKey="items" fill="#F97316" radius={[0, 8, 8, 0]} />
+                          <Bar 
+                            dataKey="items" 
+                            fill="#F97316" 
+                            radius={[0, 8, 8, 0]}
+                            onClick={(data: any, index: number, e: any) => {
+                              const payload = data.payload || data;
+                              handleStationClick(payload.name, payload.id);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     );
@@ -703,6 +825,11 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
                             outerRadius={100}
                             fill="#8884d8"
                             dataKey="items"
+                            onClick={(data: any, index: number, e: any) => {
+                              const payload = data.payload || data;
+                              handleAssetClick(payload.name, payload.id);
+                            }}
+                            style={{ cursor: 'pointer' }}
                           >
                             {groupedData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -778,6 +905,11 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
                             outerRadius={100}
                             fill="#8884d8"
                             dataKey="value"
+                            onClick={(data: any, index: number, e: any) => {
+                              const payload = data.payload || data;
+                              handleAssetClick(payload.name, payload.id);
+                            }}
+                            style={{ cursor: 'pointer' }}
                           >
                             {groupedData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -915,7 +1047,16 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
                               );
                             }}
                           />
-                          <Bar dataKey="value" fill="#F97316" radius={[8, 8, 0, 0]} />
+                          <Bar 
+                            dataKey="value" 
+                            fill="#F97316" 
+                            radius={[8, 8, 0, 0]}
+                            onClick={(data: any, index: number, e: any) => {
+                              const payload = data.payload || data;
+                              handleEmployeeClick(payload.name, payload.id);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     );
@@ -974,7 +1115,16 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
                               );
                             }}
                           />
-                          <Bar dataKey="items" fill="#F97316" radius={[8, 8, 0, 0]} />
+                          <Bar 
+                            dataKey="items" 
+                            fill="#F97316" 
+                            radius={[8, 8, 0, 0]}
+                            onClick={(data: any, index: number, e: any) => {
+                              const payload = data.payload || data;
+                              handleEmployeeClick(payload.name, payload.id);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     );
@@ -1060,7 +1210,16 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
                             );
                           }}
                         />
-                        <Bar dataKey="value" fill="#F97316" radius={[8, 8, 0, 0]} />
+                        <Bar 
+                          dataKey="value" 
+                          fill="#F97316" 
+                          radius={[8, 8, 0, 0]}
+                          onClick={(data: any, index: number, e: any) => {
+                            const payload = data.payload || data;
+                            handleDepartmentClick(payload.name, payload.id);
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   );
@@ -1119,7 +1278,16 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
                             );
                           }}
                         />
-                        <Bar dataKey="count" fill="#F97316" radius={[8, 8, 0, 0]} />
+                        <Bar 
+                          dataKey="count" 
+                          fill="#F97316" 
+                          radius={[8, 8, 0, 0]}
+                          onClick={(data: any, index: number, e: any) => {
+                            const payload = data.payload || data;
+                            handleDepartmentClick(payload.name, payload.id);
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   );

@@ -102,6 +102,20 @@ export default function AllDepartmentsComponent() {
     fetchEmployees();
   }, []);
 
+  // 🟢 Handle URL parameters for navigation from charts
+  useEffect(() => {
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.split('?')[1] || '');
+    const deptId = params.get('deptId');
+    
+    if (deptId && departments.length > 0) {
+      const dept = departments.find(d => d.id === Number(deptId));
+      if (dept) {
+        openDetails(dept);
+      }
+    }
+  }, [departments]);
+
   // Fetch employees for a department
   const fetchDepartmentEmployees = async (departmentId: number) => {
     try {
