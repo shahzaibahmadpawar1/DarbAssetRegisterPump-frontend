@@ -747,6 +747,26 @@ export default function Employees() {
                                     <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
                                   </div>
                                   <h2>Assigned Assets</h2>
+                                  ${(() => {
+                                    // Calculate total value from all items
+                                    let totalValue = 0;
+                                    e.asset_assignments.forEach((asset: any) => {
+                                      asset.batches.forEach((batch: any) => {
+                                        const items = batch.items && batch.items.length > 0 ? batch.items : [{ id: batch.batch_id, serial_number: null, assignment_date: null, purchase_price: null }];
+                                        items.forEach((item: any) => {
+                                          totalValue += item.purchase_price || 0;
+                                        });
+                                      });
+                                    });
+                                    
+                                    return `
+                                      <div style="margin-bottom: 16px; padding: 12px; background: #fff3e0; border: 2px solid #f97316; border-radius: 5px;">
+                                        <p style="margin: 0; font-size: 16px; font-weight: bold; color: #333;">
+                                          Total Value of Assigned Assets: <span style="color: #f97316;">SAR ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </p>
+                                      </div>
+                                    `;
+                                  })()}
                                   <table>
                                     <thead>
                                       <tr>
@@ -757,7 +777,6 @@ export default function Employees() {
                                         <th>Serial Number</th>
                                         <th>Assignment Date</th>
                                         <th>Value</th>
-                                        <th>Quantity</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -775,7 +794,6 @@ export default function Employees() {
                                               <td>${item.serial_number || "—"}</td>
                                               <td>${item.assignment_date ? new Date(item.assignment_date).toLocaleDateString() : "—"}</td>
                                               <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(value)}</td>
-                                              <td>1</td>
                                             </tr>
                                           `;
                                           })

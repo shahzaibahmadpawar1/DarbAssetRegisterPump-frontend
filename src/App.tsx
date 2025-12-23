@@ -330,25 +330,44 @@ function App() {
                 }}
               />
 
-              <div className="flex-1 overflow-auto">
-                {currentView === "dashboard" && (
-                  <Dashboard onViewAssets={handleViewAssets} />
-                )}
+              <div className="flex-1 overflow-auto flex flex-col">
+                <div className="flex-1">
+                  {currentView === "dashboard" && (
+                    <Dashboard onViewAssets={handleViewAssets} />
+                  )}
 
-                {currentView === "assets" && (
-                  <Assets
-                    pump_id={selectedPumpId}
-                    onBack={() => navigate("dashboard")}
-                  />
-                )}
+                  {currentView === "assets" && (
+                    <Assets
+                      pump_id={selectedPumpId}
+                      onBack={() => navigate("dashboard")}
+                    />
+                  )}
 
-                {currentView === "categories" && <Categories />}
-                {currentView === "employees" && <Employees />}
-                {currentView === "r-assets-by-cat" && <AssetsByCategoryReport />}
-                {currentView === "r-all-assets" && <AllAssetsReport />}
-                {currentView === "r-all-stations" && <AllStationsReport />}
-                {currentView === "accounts" && userRole === "admin" && <Accounts />}
-                {currentView === "analytics" && <Analytics onNavigate={(view) => navigate(view as View)} />}
+                  {currentView === "categories" && <Categories />}
+                  {currentView === "employees" && <Employees />}
+                  {currentView === "r-assets-by-cat" && <AssetsByCategoryReport />}
+                  {currentView === "r-all-assets" && <AllAssetsReport />}
+                  {currentView === "r-all-stations" && <AllStationsReport />}
+                  {currentView === "accounts" && userRole === "admin" && <Accounts />}
+                  {currentView === "analytics" && <Analytics onNavigate={(view) => navigate(view as View)} />}
+                </div>
+                
+                {/* Footer */}
+                <footer className="border-t border-border/50 bg-card/80 backdrop-blur-sm py-2 px-4 mt-auto">
+                  <div className="flex justify-end">
+                    <p className="text-xs text-muted-foreground">
+                      Developed & Powered by{" "}
+                      <a 
+                        href="https://www.nocastra.com/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Nocastra
+                      </a>
+                    </p>
+                  </div>
+                </footer>
               </div>
             </div>
           </>

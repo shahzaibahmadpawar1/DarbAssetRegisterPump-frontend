@@ -115,6 +115,20 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
             >
               {submitting ? "Signing in…" : "Sign In"}
             </Button>
+            
+            <div className="text-center pt-2">
+              <p className="text-xs text-muted-foreground">
+                Powered by{" "}
+                <a 
+                  href="https://www.nocastra.com/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline font-medium"
+                >
+                  Nocastra
+                </a>
+              </p>
+            </div>
           </form>
         </CardContent>
       </Card>

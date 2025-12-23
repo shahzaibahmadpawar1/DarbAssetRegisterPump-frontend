@@ -32,7 +32,9 @@ import type { Asset } from "@/components/AssetTable";
 import ViewBatchesModal from "@/components/ViewBatchesModal";
 import BarcodeScannerModal from "@/components/BarcodeScannerModal";
 import AssetForm, { type AssetFormData } from "@/components/AssetForm";
-import { Trash2, Search, QrCode, Printer, Plus } from "lucide-react";
+import { Trash2, Search, QrCode, Printer, Plus, Upload, FileSpreadsheet } from "lucide-react";
+import { useEffect as useEffectImport } from "react";
+import * as XLSX from 'xlsx';
 
 type AssetRow = Asset & {
   asset_value?: number | null;
@@ -138,6 +140,7 @@ export default function AllAssetsPage() {
   const [barcodeFilter, setBarcodeFilter] = useState<string | null>(null);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [isScanningMode, setIsScanningMode] = useState(false);
+  const [barcodeSearchLoading, setBarcodeSearchLoading] = useState(false);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -197,6 +200,17 @@ export default function AllAssetsPage() {
   // View batches modal state
   const [showViewBatches, setShowViewBatches] = useState(false);
   const [selectedAssetForBatches, setSelectedAssetForBatches] = useState<AssetRow | null>(null);
+  
+  // Import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  
+  // Batch assignments state
+  const [batchAssignments, setBatchAssignments] = useState<Map<number, Array<{serial_number: string | null, assigned_to: string, type: 'station' | 'employee'}>>>(new Map());
+  const [loadingBatchAssignments, setLoadingBatchAssignments] = useState(false);
   const addAssignmentRow = () =>
     setAssignmentRows((rows) => [...rows, { pump_id: null, items: [] }]);
   const removeAssignmentRow = (index: number) =>
@@ -233,28 +247,22 @@ export default function AllAssetsPage() {
     return capacity - totalAssignedDraft;
   }, [selected, totalAssignedDraft]);
 
-  // Filter assets based on search query and barcode
+  // Filter assets based on search query (barcode filtering is now done server-side)
   const filteredAssets = useMemo(() => {
     let filtered = assets;
 
-    // Filter by barcode first (if set)
-    if (barcodeFilter) {
-      filtered = filtered.filter((asset) => {
-        // Check if any assignment has a batch allocation with this barcode
-        return asset.assignments?.some((assignment: any) =>
-          assignment.batch_allocations?.some((alloc: any) =>
-            alloc.barcode?.toLowerCase() === barcodeFilter.toLowerCase()
-          )
-        ) || false;
-      });
-    }
+    // Note: Barcode filtering is now handled server-side via loadAssetsByBarcode
+    // The assets state already contains only matching assets when barcodeFilter is set
 
-    // Filter by search query (asset name or serial number)
+    // Filter by search query (asset name, asset number, serial number, or barcode)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter((asset) => {
         // Check asset name
         const nameMatch = asset.asset_name?.toLowerCase().includes(query);
+        
+        // Check asset number
+        const numberMatch = asset.asset_number?.toLowerCase().includes(query);
         
         // Check serial numbers in batch allocations
         const serialMatch = asset.assignments?.some((assignment: any) =>
@@ -263,7 +271,14 @@ export default function AllAssetsPage() {
           )
         ) || false;
 
-        return nameMatch || serialMatch;
+        // Check barcodes in batch allocations
+        const barcodeMatch = asset.assignments?.some((assignment: any) =>
+          assignment.batch_allocations?.some((alloc: any) =>
+            alloc.barcode?.toLowerCase().includes(query)
+          )
+        ) || false;
+
+        return nameMatch || numberMatch || serialMatch || barcodeMatch;
       });
     }
 
@@ -364,9 +379,225 @@ export default function AllAssetsPage() {
     setAssets(Array.isArray(data) ? data : []);
   };
 
+  // Load assets filtered by barcode
+  const loadAssetsByBarcode = async (barcode: string) => {
+    setBarcodeSearchLoading(true);
+    try {
+      const storedToken = localStorage.getItem("auth_token");
+      const res = await fetch(
+        `${API_BASE}/api/assets/search/barcode?barcode=${encodeURIComponent(barcode)}`,
+        {
+          credentials: "include",
+          headers: {
+            ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+          },
+        }
+      );
+      if (!res.ok) {
+        throw new Error("Failed to search by barcode");
+      }
+      const data = await res.json();
+      setAssets(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error searching by barcode:", err);
+      alert("Error searching by barcode. Please try again.");
+    } finally {
+      setBarcodeSearchLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadAssets();
   }, []);
+
+  // Handle barcode filter changes
+  useEffect(() => {
+    if (barcodeFilter) {
+      loadAssetsByBarcode(barcodeFilter);
+    } else {
+      // Reload all assets when barcode filter is cleared
+      loadAssets();
+    }
+  }, [barcodeFilter]);
+
+  // 📥 Handle Excel file import
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'text/csv' // .csv
+    ];
+    
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      alert("Please select a valid Excel file (.xlsx, .xls, or .csv)");
+      return;
+    }
+
+    // Load categories if not already loaded
+    let categoriesToUse = cats;
+    if (categoriesToUse.length === 0) {
+      try {
+        const r2 = await fetch(`${API_BASE}/api/categories`, { credentials: "include" });
+        const categoriesData = await r2.json();
+        categoriesToUse = Array.isArray(categoriesData) ? categoriesData : [];
+        setCats(categoriesToUse);
+      } catch (err) {
+        console.error("Failed to load categories:", err);
+      }
+    }
+
+    setImportFile(file);
+    setImportErrors([]);
+    setImportPreview([]);
+
+    // Read and preview the file
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+
+        if (jsonData.length < 2) {
+          alert("Excel file must have at least a header row and one data row");
+          return;
+        }
+
+        // Parse header row
+        const headers = jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
+        
+        // Find column indices
+        const nameIndex = headers.findIndex(h => 
+          h.includes('name') || h.includes('asset name')
+        );
+        const numberIndex = headers.findIndex(h => 
+          h.includes('number') || h.includes('asset number') || h.includes('asset #')
+        );
+        const categoryIndex = headers.findIndex(h => 
+          h.includes('category')
+        );
+
+        if (nameIndex === -1) {
+          alert("Excel file must have an 'Asset Name' column (or similar: Name)");
+          return;
+        }
+
+        if (numberIndex === -1) {
+          alert("Excel file must have an 'Asset Number' column (or similar: Asset #, Number)");
+          return;
+        }
+
+        // Parse data rows
+        const preview: any[] = [];
+        const errors: string[] = [];
+
+        for (let i = 1; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          const rowNum = i + 1;
+
+          if (!row || row.length === 0) continue; // Skip empty rows
+
+          const assetName = row[nameIndex] ? String(row[nameIndex]).trim() : '';
+          const assetNumber = row[numberIndex] ? String(row[numberIndex]).trim() : '';
+          const categoryName = row[categoryIndex] ? String(row[categoryIndex]).trim() : null;
+
+          if (!assetName) {
+            errors.push(`Row ${rowNum}: Asset name is required`);
+            continue;
+          }
+
+          if (!assetNumber) {
+            errors.push(`Row ${rowNum}: Asset number is required`);
+            continue;
+          }
+
+          // Find category ID by name (use loaded categories)
+          let categoryId = null;
+          if (categoryName) {
+            const category = categoriesToUse.find(c => 
+              c.name.toLowerCase() === categoryName.toLowerCase()
+            );
+            if (category) {
+              categoryId = category.id;
+            } else {
+              errors.push(`Row ${rowNum}: Category "${categoryName}" not found`);
+            }
+          }
+
+          preview.push({
+            asset_name: assetName,
+            asset_number: assetNumber,
+            category_id: categoryId,
+            category_name: categoryName,
+          });
+        }
+
+        setImportPreview(preview);
+        setImportErrors(errors);
+      } catch (error) {
+        console.error("Error reading Excel file:", error);
+        alert("Failed to read Excel file. Please ensure it's a valid Excel file.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // 📥 Import assets from preview
+  const handleImportAssets = async () => {
+    if (importPreview.length === 0) {
+      alert("No valid assets to import");
+      return;
+    }
+
+    try {
+      setImportLoading(true);
+      const storedToken = localStorage.getItem("auth_token");
+      
+      const assetsToImport = importPreview.map(asset => ({
+        asset_name: asset.asset_name,
+        asset_number: asset.asset_number,
+        category_id: asset.category_id || null,
+      }));
+
+      const res = await fetch(`${API_BASE}/api/assets/bulk`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({ assets: assetsToImport }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(`Failed to import assets: ${errorData.message || errorData.errors?.join(', ') || 'Unknown error'}`);
+        return;
+      }
+
+      const data = await res.json();
+      alert(`✅ Successfully imported ${data.count} asset(s)!`);
+      
+      // Reset and close
+      setImportFile(null);
+      setImportPreview([]);
+      setImportErrors([]);
+      setImportOpen(false);
+      
+      // Reload assets
+      loadAssets();
+    } catch (err) {
+      console.error("Import error:", err);
+      alert("Failed to import assets");
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   // 🟢 Handle URL parameters for navigation from charts
   useEffect(() => {
@@ -380,9 +611,17 @@ export default function AllAssetsPage() {
         setSelected(asset);
         setEditMode(false);
         setOpen(true);
+        fetchBatchAssignments(asset);
       }
     }
   }, [assets]);
+
+  // Refresh batch assignments when selected asset changes
+  useEffect(() => {
+    if (selected && open && selected.batches && selected.batches.length > 0) {
+      fetchBatchAssignments(selected);
+    }
+  }, [selected?.id, open]);
 
   // Focus hidden input when scanning mode is enabled
   useEffect(() => {
@@ -400,11 +639,99 @@ export default function AllAssetsPage() {
     }
   }, [isScanningMode]);
 
+  // Fetch batch assignments for display
+  const fetchBatchAssignments = async (asset: AssetRow) => {
+    if (!asset || !asset.batches || asset.batches.length === 0) {
+      setBatchAssignments(new Map());
+      return;
+    }
+
+    setLoadingBatchAssignments(true);
+    try {
+      const assignmentsMap = new Map<number, Array<{serial_number: string | null, assigned_to: string, type: 'station' | 'employee'}>>();
+
+      // Get station assignments from asset.assignments
+      if (asset.assignments && Array.isArray(asset.assignments)) {
+        asset.assignments.forEach((assignment: any) => {
+          if (assignment.batch_allocations && Array.isArray(assignment.batch_allocations)) {
+            assignment.batch_allocations.forEach((alloc: any) => {
+              if (!assignmentsMap.has(alloc.batch_id)) {
+                assignmentsMap.set(alloc.batch_id, []);
+              }
+              const list = assignmentsMap.get(alloc.batch_id)!;
+              list.push({
+                serial_number: alloc.serial_number || null,
+                assigned_to: assignment.pump_name || `Station #${assignment.pump_id}`,
+                type: 'station'
+              });
+            });
+          }
+        });
+      }
+
+      // Fetch employee assignments for all batches (fetch one by one or use asset_id)
+      const batchIds = asset.batches.map((b: any) => b.id);
+      if (batchIds.length > 0) {
+        try {
+          // Fetch employee assignments by asset_id (which will get all batches for this asset)
+          const storedToken = localStorage.getItem("auth_token");
+          const res = await fetch(`${API_BASE}/api/assignments/history?asset_id=${asset.id}`, {
+            credentials: "include",
+            headers: {
+              ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+            },
+          });
+          if (res.ok) {
+            const employeeAssignments = await res.json();
+            if (Array.isArray(employeeAssignments)) {
+              employeeAssignments.forEach((ea: any) => {
+                // Backend already filters for active assignments, but double-check
+                const isActive = ea.is_active === true || ea.is_active === null || ea.is_active === undefined;
+                if (isActive && batchIds.includes(ea.batch_id)) {
+                  // Check if employee data exists
+                  const employee = ea.employee;
+                  if (employee && employee.name) {
+                    if (!assignmentsMap.has(ea.batch_id)) {
+                      assignmentsMap.set(ea.batch_id, []);
+                    }
+                    const list = assignmentsMap.get(ea.batch_id)!;
+                    list.push({
+                      serial_number: ea.serial_number || null,
+                      assigned_to: `${employee.name}${employee.employee_id ? ` (${employee.employee_id})` : ''}`,
+                      type: 'employee'
+                    });
+                  } else {
+                    console.warn("Employee assignment missing employee data:", ea);
+                  }
+                }
+              });
+            } else {
+              console.warn("Employee assignments response is not an array:", employeeAssignments);
+            }
+          } else {
+            const errorText = await res.text().catch(() => 'Unknown error');
+            console.error("Failed to fetch employee assignments:", res.status, res.statusText, errorText);
+          }
+        } catch (err) {
+          console.error("Error fetching employee assignments:", err);
+        }
+      }
+
+      setBatchAssignments(assignmentsMap);
+    } catch (err) {
+      console.error("Error fetching batch assignments:", err);
+      setBatchAssignments(new Map());
+    } finally {
+      setLoadingBatchAssignments(false);
+    }
+  };
+
   // Open asset details
   const openDetails = (asset: Asset) => {
     setSelected(asset);
     setEditMode(false);
     setOpen(true);
+    fetchBatchAssignments(asset);
   };
 
   // Save edited asset
@@ -848,13 +1175,23 @@ export default function AllAssetsPage() {
               Print
             </Button>
             {isAdmin && !isViewingUser && !isAssigningUser && (
-              <Button 
-                onClick={() => setShowAssetForm(true)} 
-                className="gap-2 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
-              >
-                <Plus className="w-4 h-4" />
-                Add
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => setShowAssetForm(true)} 
+                  className="gap-2 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all duration-300 font-semibold"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add
+                </Button>
+                <Button 
+                  onClick={() => setImportOpen(true)} 
+                  variant="outline"
+                  className="gap-2 border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium"
+                >
+                  <Upload className="w-4 h-4" />
+                  Import from Excel
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -923,7 +1260,15 @@ export default function AllAssetsPage() {
         </div>
       )}
 
-      {barcodeFilter && (
+      {barcodeSearchLoading && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Searching...</strong> Please wait while we search for assets with barcode: {barcodeFilter}
+          </p>
+        </div>
+      )}
+
+      {barcodeFilter && !barcodeSearchLoading && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800">
             <strong>Filtered by barcode:</strong> {barcodeFilter}
@@ -1191,14 +1536,92 @@ export default function AllAssetsPage() {
 
               {/* Show Batches Section */}
               <div className="mt-6 pt-6 border-t">
-                <h3 className="text-lg font-semibold mb-3">Purchase Batches</h3>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-lg font-semibold">Purchase Batches</h3>
+                  {selected && selected.batches && selected.batches.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Capture current batchAssignments state
+                        const currentAssignments = batchAssignments;
+                        const html = `
+                          <html>
+                            <head>
+                              <title>Asset Details - ${selected.asset_name}</title>
+                              <style>
+                                body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
+                                h1 { text-align: center; color: #333; }
+                                .asset-info { background: #fff; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+                                .asset-info p { margin: 5px 0; }
+                                h2 { color: #333; margin-top: 20px; margin-bottom: 10px; }
+                                .batch-section { margin-bottom: 30px; background: #fff; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
+                                .batch-header { font-weight: bold; font-size: 16px; color: #333; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 2px solid #f97316; }
+                                .batch-details { margin-bottom: 10px; }
+                                .batch-details p { margin: 3px 0; font-size: 14px; }
+                                .assignments { margin-top: 10px; padding-left: 15px; border-left: 3px solid #f97316; }
+                                .assignment-item { font-family: monospace; font-size: 13px; margin: 5px 0; color: #555; }
+                                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+                                th { background: #f0f0f0; font-weight: bold; }
+                              </style>
+                            </head>
+                            <body>
+                              <h1>Asset Details Report</h1>
+                              <div class="asset-info">
+                                <p><strong>Asset Name:</strong> ${selected.asset_name}</p>
+                                <p><strong>Asset Number:</strong> ${selected.asset_number || "—"}</p>
+                                <p><strong>Category:</strong> ${selected.categoryName || "—"}</p>
+                                <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
+                              </div>
+                              <h2>Purchase Batches</h2>
+                              ${selected.batches.map((batch: any) => {
+                                const used = batch.quantity - batch.remaining_quantity;
+                                const batchValue = batch.quantity * batch.purchase_price;
+                                const remainingValue = batch.remaining_quantity * batch.purchase_price;
+                                const assignments = currentAssignments.get(batch.id) || [];
+                                
+                                return `
+                                  <div class="batch-section">
+                                    <div class="batch-header">${batch.batch_name || "Unnamed Batch"}</div>
+                                    <div class="batch-details">
+                                      <p><strong>Purchase Date:</strong> ${new Date(batch.purchase_date).toLocaleDateString()}</p>
+                                      <p><strong>Price:</strong> ${batch.purchase_price.toLocaleString()} SAR</p>
+                                      <p><strong>Quantity:</strong> ${batch.quantity}</p>
+                                      <p><strong>Remaining:</strong> ${batch.remaining_quantity}</p>
+                                      <p><strong>Remarks:</strong> ${batch.remarks || "—"}</p>
+                                      <p><strong>Total Value:</strong> ${batchValue.toLocaleString()} SAR (Used: ${used}, Remaining Value: ${remainingValue.toLocaleString()} SAR)</p>
+                                    </div>
+                                    ${assignments.length > 0 ? `
+                                      <div class="assignments">
+                                        <p style="font-weight: bold; margin-bottom: 8px;">Item Assignments:</p>
+                                        ${assignments.map((assignment: any, idx: number) => `
+                                          <div class="assignment-item">${assignment.serial_number || `Item ${idx + 1}`} → ${assignment.assigned_to}</div>
+                                        `).join("")}
+                                      </div>
+                                    ` : '<p style="color: #999; font-style: italic; margin-top: 10px;">No items assigned from this batch.</p>'}
+                                  </div>
+                                `;
+                              }).join("")}
+                            </body>
+                          </html>`;
+                        const win = window.open("", "_blank");
+                        win!.document.write(html);
+                        win!.document.close();
+                        win!.print();
+                      }}
+                      className="gap-2"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Print Details
+                    </Button>
+                  )}
+                </div>
                 {selected.batches && selected.batches.length > 0 ? (
                   <div className="space-y-2 overflow-x-auto">
-                    <div className="grid grid-cols-12 gap-3 text-xs font-semibold text-muted-foreground pb-2 border-b min-w-[1000px]">
+                    <div className="grid grid-cols-10 gap-3 text-xs font-semibold text-muted-foreground pb-2 border-b min-w-[800px]">
                       <div className="col-span-2">Name</div>
                       <div className="col-span-1">Date</div>
-                      <div className="col-span-1">Serial #</div>
-                      <div className="col-span-1">Barcode</div>
                       <div className="col-span-1">Price</div>
                       <div className="col-span-1">Quantity</div>
                       <div className="col-span-1">Remaining</div>
@@ -1211,71 +1634,88 @@ export default function AllAssetsPage() {
                       const batchValue = batch.quantity * batch.purchase_price;
                       const remainingValue = batch.remaining_quantity * batch.purchase_price;
                       const canDelete = batch.remaining_quantity === batch.quantity; // Only if unused
+                      const assignments = batchAssignments.get(batch.id) || [];
+                      
                       return (
-                        <div key={batch.id} className="grid grid-cols-12 gap-3 text-sm py-2 border-b items-center min-w-[1000px]">
-                          <div className="col-span-2 font-semibold break-words">{batch.batch_name || "—"}</div>
-                          <div className="col-span-1 font-mono text-xs">{new Date(batch.purchase_date).toLocaleDateString()}</div>
-                          <div className="col-span-1 font-mono text-xs break-words">{batch.serial_number ?? "—"}</div>
-                          <div className="col-span-1 font-mono text-xs break-words">{batch.barcode ?? "—"}</div>
-                          <div className="col-span-1 font-semibold">{batch.purchase_price.toLocaleString()}</div>
-                          <div className="col-span-1">{batch.quantity}</div>
-                          <div className={`col-span-1 ${batch.remaining_quantity === 0 ? "text-muted-foreground" : ""}`}>{batch.remaining_quantity}</div>
-                          <div className="col-span-1 text-sm text-muted-foreground break-words">{batch.remarks ?? "—"}</div>
-                          <div className="col-span-2">
-                            <div className="font-semibold">{batchValue.toLocaleString()}</div>
-                            <div className="text-xs text-muted-foreground">
-                              Used: {used} · Remaining Value: {remainingValue.toLocaleString()}
+                        <div key={batch.id} className="space-y-2">
+                          <div className="grid grid-cols-10 gap-3 text-sm py-2 border-b items-center min-w-[800px]">
+                            <div className="col-span-2 font-semibold break-words">{batch.batch_name || "Unnamed Batch"}</div>
+                            <div className="col-span-1 font-mono text-xs">{new Date(batch.purchase_date).toLocaleDateString()}</div>
+                            <div className="col-span-1 font-semibold">{batch.purchase_price.toLocaleString()}</div>
+                            <div className="col-span-1">{batch.quantity}</div>
+                            <div className={`col-span-1 ${batch.remaining_quantity === 0 ? "text-muted-foreground" : ""}`}>{batch.remaining_quantity}</div>
+                            <div className="col-span-1 text-sm text-muted-foreground break-words">{batch.remarks || "—"}</div>
+                            <div className="col-span-2">
+                              <div className="font-semibold">{batchValue.toLocaleString()}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Used: {used} · Remaining Value: {remainingValue.toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="col-span-1 text-right">
+                              {isAdmin && !isViewingUser && !isAssigningUser && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={async () => {
+                                    if (!confirm("Are you sure you want to delete this batch? This cannot be undone.")) {
+                                      return;
+                                    }
+                                    
+                                    if (!canDelete) {
+                                      alert("You can only delete batches that haven't been used (remaining quantity equals total quantity).");
+                                      return;
+                                    }
+
+                                    try {
+                                      const storedToken = localStorage.getItem("auth_token");
+                                      const res = await fetch(`${API_BASE}/api/assets/${selected.id}/batches/${batch.id}`, {
+                                        method: "DELETE",
+                                        headers: {
+                                          ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
+                                        },
+                                        credentials: "include",
+                                      });
+
+                                      if (!res.ok) {
+                                        const errorData = await res.json().catch(() => ({}));
+                                        throw new Error(errorData.message || "Failed to delete batch");
+                                      }
+
+                                      // Reload assets to refresh the data
+                                      await loadAssets();
+                                      // Update selected asset
+                                      const updatedAsset = assets.find((a) => a.id === selected.id);
+                                      if (updatedAsset) {
+                                        setSelected(updatedAsset);
+                                        fetchBatchAssignments(updatedAsset);
+                                      }
+                                    } catch (err: any) {
+                                      alert(err?.message || "Error deleting batch");
+                                    }
+                                  }}
+                                  disabled={!canDelete}
+                                  title={canDelete ? "Delete batch" : "Cannot delete used batch"}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
-                          <div className="col-span-1 text-right">
-                            {isAdmin && !isViewingUser && !isAssigningUser && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={async () => {
-                                  if (!confirm("Are you sure you want to delete this batch? This cannot be undone.")) {
-                                    return;
-                                  }
-                                  
-                                  if (!canDelete) {
-                                    alert("You can only delete batches that haven't been used (remaining quantity equals total quantity).");
-                                    return;
-                                  }
-
-                                  try {
-                                    const storedToken = localStorage.getItem("auth_token");
-                                    const res = await fetch(`${API_BASE}/api/assets/${selected.id}/batches/${batch.id}`, {
-                                      method: "DELETE",
-                                      headers: {
-                                        ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
-                                      },
-                                      credentials: "include",
-                                    });
-
-                                    if (!res.ok) {
-                                      const errorData = await res.json().catch(() => ({}));
-                                      throw new Error(errorData.message || "Failed to delete batch");
-                                    }
-
-                                    // Reload assets to refresh the data
-                                    await loadAssets();
-                                    // Update selected asset
-                                    const updatedAsset = assets.find((a) => a.id === selected.id);
-                                    if (updatedAsset) {
-                                      setSelected(updatedAsset);
-                                    }
-                                  } catch (err: any) {
-                                    alert(err?.message || "Error deleting batch");
-                                  }
-                                }}
-                                disabled={!canDelete}
-                                title={canDelete ? "Delete batch" : "Cannot delete used batch"}
-                                className="h-8 w-8"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
+                          {/* Show assignments under each batch */}
+                          {loadingBatchAssignments ? (
+                            <div className="pl-4 pb-2 text-xs text-muted-foreground">Loading assignments...</div>
+                          ) : assignments.length > 0 ? (
+                            <div className="pl-4 pb-2 border-l-2 border-muted">
+                              <div className="text-xs text-muted-foreground space-y-1">
+                                {assignments.map((assignment, idx) => (
+                                  <div key={idx} className="font-mono text-xs">
+                                    {assignment.serial_number || `Item ${idx + 1}`} → {assignment.assigned_to}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -1322,6 +1762,111 @@ export default function AllAssetsPage() {
         }}
         title="Add Asset"
       />
+
+      {/* Import Assets Modal */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Assets from Excel</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file (.xlsx, .xls, or .csv) with asset data. 
+              Required columns: Asset Name, Asset Number. Optional: Category
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* File Upload */}
+            <div>
+              <Label htmlFor="excel-file-assets" className="text-sm font-semibold mb-2 block">
+                Select Excel File
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="excel-file-assets"
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileSelect}
+                  className="flex-1"
+                />
+                {importFile && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>{importFile.name}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Excel format: Column A = Asset Name (required), Column B = Asset Number (required), Column C = Category (optional)
+              </p>
+            </div>
+
+            {/* Errors */}
+            {importErrors.length > 0 && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                <p className="text-sm font-semibold text-destructive mb-1">Validation Errors:</p>
+                <ul className="text-xs text-destructive list-disc list-inside space-y-1">
+                  {importErrors.map((error, idx) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Preview */}
+            {importPreview.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">
+                    Preview ({importPreview.length} asset(s) ready to import)
+                  </Label>
+                </div>
+                <div className="border rounded-lg max-h-64 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        <th className="p-2 text-left border-b">Asset Name</th>
+                        <th className="p-2 text-left border-b">Asset Number</th>
+                        <th className="p-2 text-left border-b">Category</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.map((asset, idx) => (
+                        <tr key={idx} className="border-b">
+                          <td className="p-2">{asset.asset_name}</td>
+                          <td className="p-2">{asset.asset_number}</td>
+                          <td className="p-2">{asset.category_name || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setImportOpen(false);
+                  setImportFile(null);
+                  setImportPreview([]);
+                  setImportErrors([]);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleImportAssets}
+                disabled={importLoading || importPreview.length === 0}
+                className="bg-primary hover:bg-primary/90"
+              >
+                {importLoading ? "Importing..." : `Import ${importPreview.length} Asset(s)`}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ASSIGN dialog */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>

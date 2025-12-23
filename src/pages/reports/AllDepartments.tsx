@@ -612,6 +612,22 @@ export default function AllDepartmentsComponent() {
                             <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
                           </div>
                           <h2>Assigned Assets</h2>
+                          ${(() => {
+                            // Calculate total value
+                            const totalValue = employeeAssignments.reduce((sum: number, assignment: any) => {
+                              const batch = assignment.batch;
+                              if (!batch) return sum;
+                              return sum + (batch.purchase_price || 0);
+                            }, 0);
+                            
+                            return `
+                              <div style="margin-bottom: 16px; padding: 12px; background: #fff3e0; border: 2px solid #f97316; border-radius: 5px;">
+                                <p style="margin: 0; font-size: 16px; font-weight: bold; color: #333;">
+                                  Total Value of Assigned Assets: <span style="color: #f97316;">SAR ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </p>
+                              </div>
+                            `;
+                          })()}
                           <table>
                             <thead>
                               <tr>
@@ -622,7 +638,6 @@ export default function AllDepartmentsComponent() {
                                 <th>Serial Number</th>
                                 <th>Assignment Date</th>
                                 <th>Value</th>
-                                <th>Quantity</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -640,7 +655,6 @@ export default function AllDepartmentsComponent() {
                                     <td>${assignment.serial_number || "—"}</td>
                                     <td>${assignment.assignment_date ? new Date(assignment.assignment_date).toLocaleDateString() : "—"}</td>
                                     <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(value)}</td>
-                                    <td>1</td>
                                   </tr>
                                 `;
                               }).join("")}
@@ -756,9 +770,26 @@ export default function AllDepartmentsComponent() {
                                   <div class="employee-info">
                                     <p><strong>Employee Name:</strong> ${selectedEmployeeForDetails.name}</p>
                                     <p><strong>Employee ID:</strong> ${selectedEmployeeForDetails.employee_id || "—"}</p>
+                                    <p><strong>Department:</strong> ${selected?.name || "—"}</p>
                                     <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
                                   </div>
                                   <h2>Assigned Assets</h2>
+                                  ${(() => {
+                                    // Calculate total value
+                                    const totalValue = employeeAssignments.reduce((sum: number, assignment: any) => {
+                                      const batch = assignment.batch;
+                                      if (!batch) return sum;
+                                      return sum + (batch.purchase_price || 0);
+                                    }, 0);
+                                    
+                                    return `
+                                      <div style="margin-bottom: 16px; padding: 12px; background: #fff3e0; border: 2px solid #f97316; border-radius: 5px;">
+                                        <p style="margin: 0; font-size: 16px; font-weight: bold; color: #333;">
+                                          Total Value of Assigned Assets: <span style="color: #f97316;">SAR ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </p>
+                                      </div>
+                                    `;
+                                  })()}
                                   <table>
                                     <thead>
                                       <tr>
@@ -769,7 +800,6 @@ export default function AllDepartmentsComponent() {
                                         <th>Serial Number</th>
                                         <th>Assignment Date</th>
                                         <th>Value</th>
-                                        <th>Quantity</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -787,7 +817,6 @@ export default function AllDepartmentsComponent() {
                                             <td>${assignment.serial_number || "—"}</td>
                                             <td>${assignment.assignment_date ? new Date(assignment.assignment_date).toLocaleDateString() : "—"}</td>
                                             <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(value)}</td>
-                                            <td>1</td>
                                           </tr>
                                         `;
                                       }).join("")}

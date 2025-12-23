@@ -33,7 +33,7 @@ export default function Sidebar({ open, onToggle, onNavigate }: SidebarProps) {
       requiresAdmin: true,
     },
     {
-      label: "Filter by Station & Category",
+      label: "Assigned Assets",
       icon: <Grid2X2 className="w-5 h-5" />,
       onClick: () => onNavigate("r-assets-by-cat"),
     },

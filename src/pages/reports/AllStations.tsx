@@ -485,7 +485,15 @@ export default function AllStationsPage() {
                                 
                                 if (allRows.length === 0) return "<p>No assets assigned to this station.</p>";
                                 
+                                // Calculate total value
+                                const totalValue = allRows.reduce((sum, row) => sum + (row.value || 0), 0);
+                                
                                 return `
+                                  <div style="margin-bottom: 16px; padding: 12px; background: #fff3e0; border: 2px solid #f97316; border-radius: 5px;">
+                                    <p style="margin: 0; font-size: 16px; font-weight: bold; color: #333;">
+                                      Total Value of Assigned Assets: <span style="color: #f97316;">SAR ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </p>
+                                  </div>
                                   <table>
                                     <thead>
                                       <tr>
@@ -496,7 +504,6 @@ export default function AllStationsPage() {
                                         <th>Serial Number</th>
                                         <th>Assignment Date</th>
                                         <th>Value</th>
-                                        <th>Quantity</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -509,7 +516,6 @@ export default function AllStationsPage() {
                                           <td>${row.serial_number}</td>
                                           <td>${row.assignment_date ? new Date(row.assignment_date).toLocaleDateString() : "—"}</td>
                                           <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(row.value)}</td>
-                                          <td>1</td>
                                         </tr>
                                       `).join("")}
                                     </tbody>
@@ -687,64 +693,72 @@ export default function AllStationsPage() {
                                         <p><strong>Report Date:</strong> ${new Date().toLocaleDateString()}</p>
                                       </div>
                                       <h2>Assigned Assets</h2>
-                                      <table>
-                                        <thead>
-                                          <tr>
-                                            <th>Asset Name</th>
-                                            <th>Asset Number</th>
-                                            <th>Batch Name</th>
-                                            <th>Purchase Date</th>
-                                            <th>Serial Number</th>
-                                            <th>Assignment Date</th>
-                                            <th>Value</th>
-                                            <th>Quantity</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          ${(() => {
-                                            const allRows: any[] = [];
-                                            stationAssets.forEach((asset) => {
-                                              const stationAssignments = asset.assignments?.filter(
-                                                (a: any) => a.pump_id === selected?.id
-                                              ) || [];
-                                              
-                                              stationAssignments.forEach((assignment: any) => {
-                                                if (assignment.batch_allocations) {
-                                                  assignment.batch_allocations.forEach((alloc: any) => {
-                                                    const batch = alloc.batch;
-                                                    if (!batch) return;
-                                                    const value = batch.purchase_price || 0;
-                                                    allRows.push({
-                                                      asset_name: asset.asset_name,
-                                                      asset_number: asset.asset_number || "—",
-                                                      batch_name: batch.batch_name || `Batch #${batch.id}`,
-                                                      purchase_date: batch.purchase_date,
-                                                      serial_number: alloc.serial_number || "—",
-                                                      assignment_date: assignment.assignment_date || alloc.assignment_date,
-                                                      value: value,
-                                                    });
-                                                  });
-                                                }
+                                      ${(() => {
+                                        // Calculate total value first
+                                        const allRows: any[] = [];
+                                        stationAssets.forEach((asset) => {
+                                          const stationAssignments = asset.assignments?.filter(
+                                            (a: any) => a.pump_id === selected?.id
+                                          ) || [];
+                                          
+                                          stationAssignments.forEach((assignment: any) => {
+                                            if (assignment.batch_allocations) {
+                                              assignment.batch_allocations.forEach((alloc: any) => {
+                                                const batch = alloc.batch;
+                                                if (!batch) return;
+                                                const value = batch.purchase_price || 0;
+                                                allRows.push({
+                                                  asset_name: asset.asset_name,
+                                                  asset_number: asset.asset_number || "—",
+                                                  batch_name: batch.batch_name || `Batch #${batch.id}`,
+                                                  purchase_date: batch.purchase_date,
+                                                  serial_number: alloc.serial_number || "—",
+                                                  assignment_date: assignment.assignment_date || alloc.assignment_date,
+                                                  value: value,
+                                                });
                                               });
-                                            });
-                                            
-                                            if (allRows.length === 0) return "<tr><td colspan='8'>No assets assigned to this station.</td></tr>";
-                                            
-                                            return allRows.map((row: any) => `
+                                            }
+                                          });
+                                        });
+                                        
+                                        if (allRows.length === 0) return "<p>No assets assigned to this station.</p>";
+                                        
+                                        const totalValue = allRows.reduce((sum, row) => sum + (row.value || 0), 0);
+                                        
+                                        return `
+                                          <div style="margin-bottom: 16px; padding: 12px; background: #fff3e0; border: 2px solid #f97316; border-radius: 5px;">
+                                            <p style="margin: 0; font-size: 16px; font-weight: bold; color: #333;">
+                                              Total Value of Assigned Assets: <span style="color: #f97316;">SAR ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            </p>
+                                          </div>
+                                          <table>
+                                            <thead>
                                               <tr>
-                                                <td>${row.asset_name}</td>
-                                                <td>${row.asset_number}</td>
-                                                <td>${row.batch_name}</td>
-                                                <td>${new Date(row.purchase_date).toLocaleDateString()}</td>
-                                                <td>${row.serial_number}</td>
-                                                <td>${row.assignment_date ? new Date(row.assignment_date).toLocaleDateString() : "—"}</td>
-                                                <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(row.value)}</td>
-                                                <td>1</td>
+                                                <th>Asset Name</th>
+                                                <th>Asset Number</th>
+                                                <th>Batch Name</th>
+                                                <th>Purchase Date</th>
+                                                <th>Serial Number</th>
+                                                <th>Assignment Date</th>
+                                                <th>Value</th>
                                               </tr>
-                                            `).join("");
-                                          })()}
-                                        </tbody>
-                                      </table>
+                                            </thead>
+                                            <tbody>
+                                              ${allRows.map((row: any) => `
+                                                <tr>
+                                                  <td>${row.asset_name}</td>
+                                                  <td>${row.asset_number}</td>
+                                                  <td>${row.batch_name}</td>
+                                                  <td>${new Date(row.purchase_date).toLocaleDateString()}</td>
+                                                  <td>${row.serial_number}</td>
+                                                  <td>${row.assignment_date ? new Date(row.assignment_date).toLocaleDateString() : "—"}</td>
+                                                  <td>${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'SAR' }).format(row.value)}</td>
+                                                </tr>
+                                              `).join("")}
+                                            </tbody>
+                                          </table>
+                                        `;
+                                      })()}
                                     </body>
                                   </html>`;
                                 const win = window.open("", "_blank");
