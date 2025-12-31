@@ -28,11 +28,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Check, ChevronsUpDown, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 

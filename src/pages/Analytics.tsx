@@ -30,21 +30,21 @@ const COLORS = ['#F97316', '#FB923C', '#FDBA74', '#FED7AA', '#FFEDD5', '#FEF3C7'
 
 // Helper function to group small items into "Others" category
 // Returns both the grouped data and a map of "Others" items for tooltips
-const groupSmallItems = <T extends { name: string; [key: string]: any }>(
+const groupSmallItems = <T extends { name: string;[key: string]: any }>(
   data: T[],
   valueKey: string,
   thresholdPercent: number = 5 // Default: group items with less than 5% share
 ): { groupedData: T[]; othersItems: T[] } => {
   if (data.length === 0) return { groupedData: data, othersItems: [] };
-  
+
   const total = data.reduce((sum, item) => sum + (Number(item[valueKey]) || 0), 0);
   if (total === 0) return { groupedData: data, othersItems: [] };
-  
+
   const threshold = (total * thresholdPercent) / 100;
   const mainItems: T[] = [];
   const othersItems: T[] = [];
   let othersValue = 0;
-  
+
   data.forEach((item) => {
     const value = Number(item[valueKey]) || 0;
     if (value >= threshold) {
@@ -54,7 +54,7 @@ const groupSmallItems = <T extends { name: string; [key: string]: any }>(
       othersValue += value;
     }
   });
-  
+
   if (othersItems.length > 0) {
     const othersItem = {
       name: `Others (${othersItems.length})`,
@@ -64,7 +64,7 @@ const groupSmallItems = <T extends { name: string; [key: string]: any }>(
     } as T & { _isOthers?: boolean; _othersItems?: T[] };
     return { groupedData: [...mainItems, othersItem], othersItems };
   }
-  
+
   return { groupedData: mainItems, othersItems: [] };
 };
 
@@ -172,7 +172,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
       // Calculate total assigned items (items with serial numbers)
       // Count from batch_allocations (station assignments) and employee_asset_assignments
       let totalAssignedItems = 0;
-      
+
       // Count from station assignments (batch_allocations with serial_number)
       assets?.forEach((asset: any) => {
         if (asset.assignments && asset.assignments.length > 0) {
@@ -194,13 +194,13 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
       const totalEmployeeAssigned = assets?.reduce((sum: number, asset: any) => {
         return sum + (asset.totalAssignedToEmployees || 0);
       }, 0) || 0;
-      
+
       totalAssignedItems += totalEmployeeAssigned;
 
       // Top Stations by Value
       const stationValueMap = new Map<number, number>();
       const stationItemsMap = new Map<number, number>();
-      
+
       assets?.forEach((asset: any) => {
         if (asset.assignments && asset.assignments.length > 0) {
           asset.assignments.forEach((assignment: any) => {
@@ -208,7 +208,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
             // Sum value
             const currentValue = stationValueMap.get(pumpId) || 0;
             stationValueMap.set(pumpId, currentValue + (assignment.assignment_value || 0));
-            
+
             // Sum items (count from batch_allocations)
             const currentItems = stationItemsMap.get(pumpId) || 0;
             let itemsCount = 0;
@@ -249,7 +249,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
       // Top Employees by Value and Items
       const employeeValueMap = new Map<number, number>();
       const employeeItemsMap = new Map<number, number>();
-      
+
       // Fetch employee assignments
       const employeeAssignmentsPromises = (employees || []).map(async (emp: any) => {
         try {
@@ -260,13 +260,13 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
           return { employee: emp, assignments: [] };
         }
       });
-      
+
       const employeeAssignmentsData = await Promise.all(employeeAssignmentsPromises);
-      
+
       employeeAssignmentsData.forEach(({ employee, assignments }) => {
         let totalValue = 0;
         let totalItems = 0;
-        
+
         assignments.forEach((assignment: any) => {
           // Employee assignments API returns batch with nested asset info
           if (assignment.batch) {
@@ -277,7 +277,7 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
             }
           }
         });
-        
+
         if (totalValue > 0 || totalItems > 0) {
           employeeValueMap.set(employee.id, totalValue);
           employeeItemsMap.set(employee.id, totalItems);
@@ -311,10 +311,10 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
       // Calculate total assigned values
       const totalStationAssignedValue = Array.from(stationValueMap.values())
         .reduce((sum, value) => sum + value, 0);
-      
+
       const totalEmployeeAssignedValue = Array.from(employeeValueMap.values())
         .reduce((sum, value) => sum + value, 0);
-      
+
       const totalAssignedValue = totalStationAssignedValue + totalEmployeeAssignedValue;
 
       // Top Assets by Items and Value
@@ -328,18 +328,18 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
           id: asset.id,
         };
       })
-      .filter((a: any) => a.items > 0)
-      .sort((a: any, b: any) => b.items - a.items)
-      .slice(0, 10) || [];
+        .filter((a: any) => a.items > 0)
+        .sort((a: any, b: any) => b.items - a.items)
+        .slice(0, 10) || [];
 
       const topAssetsByValue = assets?.map((asset: any) => ({
         name: asset.asset_name || `Asset #${asset.id}`,
         value: Math.round(asset.totalValue || 0),
         id: asset.id,
       }))
-      .filter((a: any) => a.value > 0)
-      .sort((a: any, b: any) => b.value - a.value)
-      .slice(0, 10) || [];
+        .filter((a: any) => a.value > 0)
+        .sort((a: any, b: any) => b.value - a.value)
+        .slice(0, 10) || [];
 
       // Category Distribution
       const categoryMap = new Map<string, number>();
@@ -452,855 +452,855 @@ export default function Analytics({ onNavigate }: AnalyticsProps) {
               </div>
             </div>
 
-        {/* Key Metrics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Assets</CardTitle>
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Package className="h-5 w-5 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Assets = </span>
-                  <span className="font-bold text-lg">{data.totalAssets.toLocaleString()}</span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Items = </span>
-                  <span className="font-bold text-lg">{data.totalBatchItems.toLocaleString()}</span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Assigned Items = </span>
-                  <span className="font-bold text-lg">{data.totalAssignedItems.toLocaleString()}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Value (SAR)</CardTitle>
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-bold text-sm">SAR</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">SAR {formatCurrency(data.totalValue)}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Assigned Value (SAR)</CardTitle>
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-bold text-sm">SAR</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold">SAR {formatCurrency(data.totalAssignedValue)}</div>
-                <div className="text-sm pt-2 space-y-1">
-                  <div>
-                    <span className="text-muted-foreground">Assigned to Station = </span>
-                    <span className="font-semibold">SAR {formatCurrency(data.totalStationAssignedValue)}</span>
+            {/* Key Metrics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Assets</CardTitle>
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Package className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Assigned to Employee = </span>
-                    <span className="font-semibold">SAR {formatCurrency(data.totalEmployeeAssignedValue)}</span>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Assets = </span>
+                      <span className="font-bold text-lg">{data.totalAssets.toLocaleString()}</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Items = </span>
+                      <span className="font-bold text-lg">{data.totalBatchItems.toLocaleString()}</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Assigned Items = </span>
+                      <span className="font-bold text-lg">{data.totalAssignedItems.toLocaleString()}</span>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Stations</CardTitle>
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{data.totalStations.toLocaleString()}</div>
-            </CardContent>
-          </Card>
-        </div>
+              <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Value (SAR)</CardTitle>
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <span className="text-primary font-bold text-sm">SAR</span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">SAR {formatCurrency(data.totalValue)}</div>
+                </CardContent>
+              </Card>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Top Stations */}
-          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>Station Insights</CardTitle>
-                  <p className="text-sm text-muted-foreground">Performance across stations</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="value" className="w-full">
-                <TabsList className="grid w-full max-w-md grid-cols-2 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm mb-6">
-                  <TabsTrigger value="value" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    By Value
-                  </TabsTrigger>
-                  <TabsTrigger value="items" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    By No. of Items
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="value">
-                  {data.topStationsByValue.length > 0 ? (() => {
-                    const { groupedData } = groupSmallItems(data.topStationsByValue, 'value', 5);
-                    return (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart
-                          data={groupedData}
-                          layout="vertical"
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis type="number" tickFormatter={formatCurrency} />
-                          <YAxis 
-                            dataKey="name" 
-                            type="category" 
-                            width={120}
-                            tick={{ fontSize: 11 }}
-                            angle={0}
-                          />
-                          <Tooltip 
-                            content={({ active, payload }) => {
-                              if (!active || !payload || !payload[0]) return null;
-                              const data = payload[0].payload;
-                              const isOthers = (data as any)._isOthers;
-                              const othersItems = (data as any)._othersItems || [];
-                              
-                              return (
-                                <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
-                                  <p className="font-semibold text-foreground mb-1">
-                                    {data.name}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Value: <span className="font-semibold text-foreground">SAR {data.value.toLocaleString()}</span>
-                                  </p>
-                                  {isOthers && othersItems.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-border">
-                                      <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
-                                      <div className="max-h-32 overflow-y-auto">
-                                        {othersItems.map((item: any, idx: number) => (
-                                          <p key={idx} className="text-xs text-muted-foreground">
-                                            • {item.name}: SAR {item.value.toLocaleString()}
-                                          </p>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            }}
-                          />
-                          <Bar 
-                            dataKey="value" 
-                            fill="#F97316" 
-                            radius={[0, 8, 8, 0]}
-                            onClick={(data: any, index: number, e: any) => {
-                              const payload = data.payload || data;
-                              handleStationClick(payload.name, payload.id);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    );
-                  })() : (
-                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                      No station data available
+              <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Assigned Value (SAR)</CardTitle>
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <span className="text-primary font-bold text-sm">SAR</span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold">SAR {formatCurrency(data.totalAssignedValue)}</div>
+                    <div className="text-sm pt-2 space-y-1">
+                      <div>
+                        <span className="text-muted-foreground">Assigned to Station = </span>
+                        <span className="font-semibold">SAR {formatCurrency(data.totalStationAssignedValue)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Assigned to Employee = </span>
+                        <span className="font-semibold">SAR {formatCurrency(data.totalEmployeeAssignedValue)}</span>
+                      </div>
                     </div>
-                  )}
-                </TabsContent>
-                <TabsContent value="items">
-                  {data.topStationsByItems.length > 0 ? (() => {
-                    const { groupedData } = groupSmallItems(data.topStationsByItems, 'items', 5);
-                    return (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart
-                          data={groupedData}
-                          layout="vertical"
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis type="number" />
-                          <YAxis 
-                            dataKey="name" 
-                            type="category" 
-                            width={120}
-                            tick={{ fontSize: 11 }}
-                            angle={0}
-                          />
-                          <Tooltip 
-                            content={({ active, payload }) => {
-                              if (!active || !payload || !payload[0]) return null;
-                              const data = payload[0].payload;
-                              const isOthers = (data as any)._isOthers;
-                              const othersItems = (data as any)._othersItems || [];
-                              
-                              return (
-                                <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
-                                  <p className="font-semibold text-foreground mb-1">
-                                    {data.name}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Items: <span className="font-semibold text-foreground">{data.items.toLocaleString()}</span>
-                                  </p>
-                                  {isOthers && othersItems.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-border">
-                                      <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
-                                      <div className="max-h-32 overflow-y-auto">
-                                        {othersItems.map((item: any, idx: number) => (
-                                          <p key={idx} className="text-xs text-muted-foreground">
-                                            • {item.name}: {item.items.toLocaleString()} items
-                                          </p>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            }}
-                          />
-                          <Bar 
-                            dataKey="items" 
-                            fill="#F97316" 
-                            radius={[0, 8, 8, 0]}
-                            onClick={(data: any, index: number, e: any) => {
-                              const payload = data.payload || data;
-                              handleStationClick(payload.name, payload.id);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    );
-                  })() : (
-                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                      No station data available
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Asset Distribution by Category */}
-          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Package className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>Asset Distribution</CardTitle>
-                  <p className="text-sm text-muted-foreground">By category</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {data.categoryDistribution.length > 0 ? (() => {
-                const { groupedData } = groupSmallItems(data.categoryDistribution, 'value', 5);
-                return (
-                  <div className="space-y-4">
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={groupedData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {groupedData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
-                          content={({ active, payload }) => {
-                            if (!active || !payload || !payload[0]) return null;
-                            const data = payload[0].payload;
-                            const isOthers = (data as any)._isOthers;
-                            const othersItems = (data as any)._othersItems || [];
-                            
-                            return (
-                              <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
-                                <p className="font-semibold text-foreground mb-1">
-                                  {data.name}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  Count: <span className="font-semibold text-foreground">{data.value}</span>
-                                </p>
-                                {isOthers && othersItems.length > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-border">
-                                    <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
-                                    <div className="max-h-32 overflow-y-auto">
-                                      {othersItems.map((item: any, idx: number) => (
-                                        <p key={idx} className="text-xs text-muted-foreground">
-                                          • {item.name}: {item.value}
-                                        </p>
-                                      ))}
+              <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Stations</CardTitle>
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-primary" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{data.totalStations.toLocaleString()}</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Top Stations */}
+              <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle>Top Stations Asset Assigned</CardTitle>
+                      <p className="text-sm text-muted-foreground">Performance across stations</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="value" className="w-full">
+                    <TabsList className="grid w-full max-w-md grid-cols-2 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm mb-6">
+                      <TabsTrigger value="value" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                        By Value
+                      </TabsTrigger>
+                      <TabsTrigger value="items" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                        By No. of Items
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="value">
+                      {data.topStationsByValue.length > 0 ? (() => {
+                        const { groupedData } = groupSmallItems(data.topStationsByValue, 'value', 5);
+                        return (
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart
+                              data={groupedData}
+                              layout="vertical"
+                              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis type="number" tickFormatter={formatCurrency} />
+                              <YAxis
+                                dataKey="name"
+                                type="category"
+                                width={120}
+                                tick={{ fontSize: 11 }}
+                                angle={0}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload[0]) return null;
+                                  const data = payload[0].payload;
+                                  const isOthers = (data as any)._isOthers;
+                                  const othersItems = (data as any)._othersItems || [];
+
+                                  return (
+                                    <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
+                                      <p className="font-semibold text-foreground mb-1">
+                                        {data.name}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Value: <span className="font-semibold text-foreground">SAR {data.value.toLocaleString()}</span>
+                                      </p>
+                                      {isOthers && othersItems.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
+                                          <div className="max-h-32 overflow-y-auto">
+                                            {othersItems.map((item: any, idx: number) => (
+                                              <p key={idx} className="text-xs text-muted-foreground">
+                                                • {item.name}: SAR {item.value.toLocaleString()}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="flex flex-wrap gap-4 justify-center">
-                      {groupedData.map((item, index) => (
-                        <div key={item.name} className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                          />
-                          <span className="text-sm text-muted-foreground">
-                            {item.name}: <span className="font-semibold text-foreground">{item.value}</span>
-                          </span>
+                                  );
+                                }}
+                              />
+                              <Bar
+                                dataKey="value"
+                                fill="#F97316"
+                                radius={[0, 8, 8, 0]}
+                                onClick={(data: any, index: number, e: any) => {
+                                  const payload = data.payload || data;
+                                  handleStationClick(payload.name, payload.id);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        );
+                      })() : (
+                        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                          No station data available
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })() : (
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  No category data available
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                      )}
+                    </TabsContent>
+                    <TabsContent value="items">
+                      {data.topStationsByItems.length > 0 ? (() => {
+                        const { groupedData } = groupSmallItems(data.topStationsByItems, 'items', 5);
+                        return (
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart
+                              data={groupedData}
+                              layout="vertical"
+                              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis type="number" />
+                              <YAxis
+                                dataKey="name"
+                                type="category"
+                                width={120}
+                                tick={{ fontSize: 11 }}
+                                angle={0}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload[0]) return null;
+                                  const data = payload[0].payload;
+                                  const isOthers = (data as any)._isOthers;
+                                  const othersItems = (data as any)._othersItems || [];
 
-        {/* Top Assets Pie Chart */}
-        <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Package className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Top Assets</CardTitle>
-                <p className="text-sm text-muted-foreground">Leading assets by items and value</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="items" className="w-full">
-              <TabsList className="grid w-full max-w-md grid-cols-2 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm mb-6">
-                <TabsTrigger value="items" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  By No. of Items
-                </TabsTrigger>
-                <TabsTrigger value="value" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  By Value
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="items">
-                {data.topAssetsByItems.length > 0 ? (() => {
-                  const { groupedData } = groupSmallItems(data.topAssetsByItems, 'items', 5);
-                  return (
-                    <div className="space-y-4">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={groupedData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            outerRadius={100}
-                            fill="#8884d8"
-                            dataKey="items"
-                            onClick={(data: any, index: number, e: any) => {
-                              const payload = data.payload || data;
-                              handleAssetClick(payload.name, payload.id);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          >
-                            {groupedData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip 
-                            content={({ active, payload }) => {
-                              if (!active || !payload || !payload[0]) return null;
-                              const data = payload[0].payload;
-                              const isOthers = (data as any)._isOthers;
-                              const othersItems = (data as any)._othersItems || [];
-                              
-                              return (
-                                <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
-                                  <p className="font-semibold text-foreground mb-1">
-                                    {data.name}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Items: <span className="font-semibold text-foreground">{data.items.toLocaleString()}</span>
-                                  </p>
-                                  {isOthers && othersItems.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-border">
-                                      <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
-                                      <div className="max-h-32 overflow-y-auto">
-                                        {othersItems.map((item: any, idx: number) => (
-                                          <p key={idx} className="text-xs text-muted-foreground">
-                                            • {item.name}: {item.items.toLocaleString()} items
-                                          </p>
-                                        ))}
-                                      </div>
+                                  return (
+                                    <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
+                                      <p className="font-semibold text-foreground mb-1">
+                                        {data.name}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Items: <span className="font-semibold text-foreground">{data.items.toLocaleString()}</span>
+                                      </p>
+                                      {isOthers && othersItems.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
+                                          <div className="max-h-32 overflow-y-auto">
+                                            {othersItems.map((item: any, idx: number) => (
+                                              <p key={idx} className="text-xs text-muted-foreground">
+                                                • {item.name}: {item.items.toLocaleString()} items
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                              );
-                            }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="flex flex-wrap gap-4 justify-center">
-                        {groupedData.slice(0, 8).map((item, index) => (
-                          <div key={item.name} className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              {item.name}: <span className="font-semibold text-foreground">{item.items}</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })() : (
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No asset data available
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="value">
-                {data.topAssetsByValue.length > 0 ? (() => {
-                  const { groupedData } = groupSmallItems(data.topAssetsByValue, 'value', 5);
-                  return (
-                    <div className="space-y-4">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={groupedData}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            outerRadius={100}
-                            fill="#8884d8"
-                            dataKey="value"
-                            onClick={(data: any, index: number, e: any) => {
-                              const payload = data.payload || data;
-                              handleAssetClick(payload.name, payload.id);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          >
-                            {groupedData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip 
-                            content={({ active, payload }) => {
-                              if (!active || !payload || !payload[0]) return null;
-                              const data = payload[0].payload;
-                              const isOthers = (data as any)._isOthers;
-                              const othersItems = (data as any)._othersItems || [];
-                              
-                              return (
-                                <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
-                                  <p className="font-semibold text-foreground mb-1">
-                                    {data.name}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Value: <span className="font-semibold text-foreground">SAR {data.value.toLocaleString()}</span>
-                                  </p>
-                                  {isOthers && othersItems.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-border">
-                                      <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
-                                      <div className="max-h-32 overflow-y-auto">
-                                        {othersItems.map((item: any, idx: number) => (
-                                          <p key={idx} className="text-xs text-muted-foreground">
-                                            • {item.name}: SAR {item.value.toLocaleString()}
-                                          </p>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="flex flex-wrap gap-4 justify-center">
-                        {groupedData.slice(0, 8).map((item, index) => (
-                          <div key={item.name} className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                            />
-                            <span className="text-sm text-muted-foreground">
-                              {item.name}: <span className="font-semibold text-foreground">SAR {formatCurrency(item.value)}</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })() : (
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No asset data available
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                                  );
+                                }}
+                              />
+                              <Bar
+                                dataKey="items"
+                                fill="#F97316"
+                                radius={[0, 8, 8, 0]}
+                                onClick={(data: any, index: number, e: any) => {
+                                  const payload = data.payload || data;
+                                  handleStationClick(payload.name, payload.id);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        );
+                      })() : (
+                        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                          No station data available
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
 
-        {/* Employee and Department Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Employee Insights */}
-          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>Employee Insights</CardTitle>
-                  <p className="text-sm text-muted-foreground">Performance across employees</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="value" className="w-full">
-                <TabsList className="grid w-full max-w-md grid-cols-2 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm mb-6">
-                  <TabsTrigger value="value" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    By Asset Value
-                  </TabsTrigger>
-                  <TabsTrigger value="items" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    By No. of Items Assigned
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="value">
-                  {data.topEmployeesByValue.length > 0 ? (() => {
-                    const { groupedData } = groupSmallItems(data.topEmployeesByValue, 'value', 5);
+              {/* Asset Distribution by Category */}
+              <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Package className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle>Asset Distribution</CardTitle>
+                      <p className="text-sm text-muted-foreground">By category</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {data.categoryDistribution.length > 0 ? (() => {
+                    const { groupedData } = groupSmallItems(data.categoryDistribution, 'value', 5);
                     return (
-                      <ResponsiveContainer width="100%" height={400}>
-                        <BarChart
-                          data={groupedData}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis
-                            dataKey="name"
-                            angle={-45}
-                            textAnchor="end"
-                            height={100}
-                            tick={{ fontSize: 11 }}
-                          />
-                          <YAxis tickFormatter={formatCurrency} />
-                          <Tooltip 
-                            content={({ active, payload }) => {
-                              if (!active || !payload || !payload[0]) return null;
-                              const data = payload[0].payload;
-                              const isOthers = (data as any)._isOthers;
-                              const othersItems = (data as any)._othersItems || [];
-                              
-                              return (
-                                <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
-                                  <p className="font-semibold text-foreground mb-1">
-                                    {data.name}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Value: <span className="font-semibold text-foreground">SAR {data.value.toLocaleString()}</span>
-                                  </p>
-                                  {isOthers && othersItems.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-border">
-                                      <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
-                                      <div className="max-h-32 overflow-y-auto">
-                                        {othersItems.map((item: any, idx: number) => (
-                                          <p key={idx} className="text-xs text-muted-foreground">
-                                            • {item.name}: SAR {item.value.toLocaleString()}
-                                          </p>
-                                        ))}
+                      <div className="space-y-4">
+                        <ResponsiveContainer width="100%" height={250}>
+                          <PieChart>
+                            <Pie
+                              data={groupedData}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {groupedData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (!active || !payload || !payload[0]) return null;
+                                const data = payload[0].payload;
+                                const isOthers = (data as any)._isOthers;
+                                const othersItems = (data as any)._othersItems || [];
+
+                                return (
+                                  <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
+                                    <p className="font-semibold text-foreground mb-1">
+                                      {data.name}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Count: <span className="font-semibold text-foreground">{data.value}</span>
+                                    </p>
+                                    {isOthers && othersItems.length > 0 && (
+                                      <div className="mt-2 pt-2 border-t border-border">
+                                        <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
+                                        <div className="max-h-32 overflow-y-auto">
+                                          {othersItems.map((item: any, idx: number) => (
+                                            <p key={idx} className="text-xs text-muted-foreground">
+                                              • {item.name}: {item.value}
+                                            </p>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            }}
-                          />
-                          <Bar 
-                            dataKey="value" 
-                            fill="#F97316" 
-                            radius={[8, 8, 0, 0]}
-                            onClick={(data: any, index: number, e: any) => {
-                              const payload = data.payload || data;
-                              handleEmployeeClick(payload.name, payload.id);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
+                                    )}
+                                  </div>
+                                );
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="flex flex-wrap gap-4 justify-center">
+                          {groupedData.map((item, index) => (
+                            <div key={item.name} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                              />
+                              <span className="text-sm text-muted-foreground">
+                                {item.name}: <span className="font-semibold text-foreground">{item.value}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     );
                   })() : (
-                    <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                      No employee data available
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      No category data available
                     </div>
                   )}
-                </TabsContent>
-                <TabsContent value="items">
-                  {data.topEmployeesByItems.length > 0 ? (() => {
-                    const { groupedData } = groupSmallItems(data.topEmployeesByItems, 'items', 5);
-                    return (
-                      <ResponsiveContainer width="100%" height={400}>
-                        <BarChart
-                          data={groupedData}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis
-                            dataKey="name"
-                            angle={-45}
-                            textAnchor="end"
-                            height={100}
-                            tick={{ fontSize: 11 }}
-                          />
-                          <YAxis />
-                          <Tooltip 
-                            content={({ active, payload }) => {
-                              if (!active || !payload || !payload[0]) return null;
-                              const data = payload[0].payload;
-                              const isOthers = (data as any)._isOthers;
-                              const othersItems = (data as any)._othersItems || [];
-                              
-                              return (
-                                <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
-                                  <p className="font-semibold text-foreground mb-1">
-                                    {data.name}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Items: <span className="font-semibold text-foreground">{data.items.toLocaleString()}</span>
-                                  </p>
-                                  {isOthers && othersItems.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t border-border">
-                                      <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
-                                      <div className="max-h-32 overflow-y-auto">
-                                        {othersItems.map((item: any, idx: number) => (
-                                          <p key={idx} className="text-xs text-muted-foreground">
-                                            • {item.name}: {item.items.toLocaleString()} items
-                                          </p>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            }}
-                          />
-                          <Bar 
-                            dataKey="items" 
-                            fill="#F97316" 
-                            radius={[8, 8, 0, 0]}
-                            onClick={(data: any, index: number, e: any) => {
-                              const payload = data.payload || data;
-                              handleEmployeeClick(payload.name, payload.id);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    );
-                  })() : (
-                    <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                      No employee data available
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-
-          {/* Department Insights */}
-          <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle>Department Insights</CardTitle>
-                <p className="text-sm text-muted-foreground">Performance across departments</p>
-              </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="value" className="w-full">
-              <TabsList className="grid w-full max-w-md grid-cols-2 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm mb-6">
-                <TabsTrigger value="value" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  By Value
-                </TabsTrigger>
-                <TabsTrigger value="employees" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  By Employee Count
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="value">
-                {data.departmentValue.length > 0 ? (() => {
-                  const { groupedData } = groupSmallItems(data.departmentValue, 'value', 5);
-                  return (
-                    <ResponsiveContainer width="100%" height={400}>
-                      <BarChart
-                        data={groupedData}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis
-                          dataKey="name"
-                          angle={-45}
-                          textAnchor="end"
-                          height={100}
-                          tick={{ fontSize: 11 }}
-                        />
-                        <YAxis tickFormatter={formatCurrency} />
-                        <Tooltip 
-                          content={({ active, payload }) => {
-                            if (!active || !payload || !payload[0]) return null;
-                            const data = payload[0].payload;
-                            const isOthers = (data as any)._isOthers;
-                            const othersItems = (data as any)._othersItems || [];
-                            
-                            return (
-                              <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
-                                <p className="font-semibold text-foreground mb-1">
-                                  {data.name}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  Value: <span className="font-semibold text-foreground">SAR {data.value.toLocaleString()}</span>
-                                </p>
-                                {isOthers && othersItems.length > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-border">
-                                    <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
-                                    <div className="max-h-32 overflow-y-auto">
-                                      {othersItems.map((item: any, idx: number) => (
-                                        <p key={idx} className="text-xs text-muted-foreground">
-                                          • {item.name}: SAR {item.value.toLocaleString()}
-                                        </p>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          }}
-                        />
-                        <Bar 
-                          dataKey="value" 
-                          fill="#F97316" 
-                          radius={[8, 8, 0, 0]}
-                          onClick={(data: any, index: number, e: any) => {
-                            const payload = data.payload || data;
-                            handleDepartmentClick(payload.name, payload.id);
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  );
-                })() : (
-                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                    No department value data available
+
+            {/* Top Assets Pie Chart */}
+            <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Package className="h-5 w-5 text-primary" />
                   </div>
-                )}
-              </TabsContent>
-              <TabsContent value="employees">
-                {data.departmentEmployeeCount.length > 0 ? (() => {
-                  const { groupedData } = groupSmallItems(data.departmentEmployeeCount, 'count', 5);
-                  return (
-                    <ResponsiveContainer width="100%" height={400}>
-                      <BarChart
-                        data={groupedData}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis
-                          dataKey="name"
-                          angle={-45}
-                          textAnchor="end"
-                          height={100}
-                          tick={{ fontSize: 11 }}
-                        />
-                        <YAxis />
-                        <Tooltip 
-                          content={({ active, payload }) => {
-                            if (!active || !payload || !payload[0]) return null;
-                            const data = payload[0].payload;
-                            const isOthers = (data as any)._isOthers;
-                            const othersItems = (data as any)._othersItems || [];
-                            
-                            return (
-                              <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
-                                <p className="font-semibold text-foreground mb-1">
-                                  {data.name}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  Count: <span className="font-semibold text-foreground">{data.count}</span>
-                                </p>
-                                {isOthers && othersItems.length > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-border">
-                                    <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
-                                    <div className="max-h-32 overflow-y-auto">
-                                      {othersItems.map((item: any, idx: number) => (
-                                        <p key={idx} className="text-xs text-muted-foreground">
-                                          • {item.name}: {item.count} employees
-                                        </p>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          }}
-                        />
-                        <Bar 
-                          dataKey="count" 
-                          fill="#F97316" 
-                          radius={[8, 8, 0, 0]}
-                          onClick={(data: any, index: number, e: any) => {
-                            const payload = data.payload || data;
-                            handleDepartmentClick(payload.name, payload.id);
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  );
-                })() : (
-                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                    No department employee data available
+                  <div>
+                    <CardTitle>Top Assets</CardTitle>
+                    <p className="text-sm text-muted-foreground">Leading assets by items and value</p>
                   </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-        </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="items" className="w-full">
+                  <TabsList className="grid w-full max-w-md grid-cols-2 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm mb-6">
+                    <TabsTrigger value="items" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      By No. of Items
+                    </TabsTrigger>
+                    <TabsTrigger value="value" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      By Value
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="items">
+                    {data.topAssetsByItems.length > 0 ? (() => {
+                      const { groupedData } = groupSmallItems(data.topAssetsByItems, 'items', 5);
+                      return (
+                        <div className="space-y-4">
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={groupedData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                dataKey="items"
+                                onClick={(data: any, index: number, e: any) => {
+                                  const payload = data.payload || data;
+                                  handleAssetClick(payload.name, payload.id);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                {groupedData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload[0]) return null;
+                                  const data = payload[0].payload;
+                                  const isOthers = (data as any)._isOthers;
+                                  const othersItems = (data as any)._othersItems || [];
+
+                                  return (
+                                    <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
+                                      <p className="font-semibold text-foreground mb-1">
+                                        {data.name}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Items: <span className="font-semibold text-foreground">{data.items.toLocaleString()}</span>
+                                      </p>
+                                      {isOthers && othersItems.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
+                                          <div className="max-h-32 overflow-y-auto">
+                                            {othersItems.map((item: any, idx: number) => (
+                                              <p key={idx} className="text-xs text-muted-foreground">
+                                                • {item.name}: {item.items.toLocaleString()} items
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="flex flex-wrap gap-4 justify-center">
+                            {groupedData.slice(0, 8).map((item, index) => (
+                              <div key={item.name} className="flex items-center gap-2">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                />
+                                <span className="text-sm text-muted-foreground">
+                                  {item.name}: <span className="font-semibold text-foreground">{item.items}</span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })() : (
+                      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                        No asset data available
+                      </div>
+                    )}
+                  </TabsContent>
+                  <TabsContent value="value">
+                    {data.topAssetsByValue.length > 0 ? (() => {
+                      const { groupedData } = groupSmallItems(data.topAssetsByValue, 'value', 5);
+                      return (
+                        <div className="space-y-4">
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={groupedData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                dataKey="value"
+                                onClick={(data: any, index: number, e: any) => {
+                                  const payload = data.payload || data;
+                                  handleAssetClick(payload.name, payload.id);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                {groupedData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload[0]) return null;
+                                  const data = payload[0].payload;
+                                  const isOthers = (data as any)._isOthers;
+                                  const othersItems = (data as any)._othersItems || [];
+
+                                  return (
+                                    <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
+                                      <p className="font-semibold text-foreground mb-1">
+                                        {data.name}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Value: <span className="font-semibold text-foreground">SAR {data.value.toLocaleString()}</span>
+                                      </p>
+                                      {isOthers && othersItems.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
+                                          <div className="max-h-32 overflow-y-auto">
+                                            {othersItems.map((item: any, idx: number) => (
+                                              <p key={idx} className="text-xs text-muted-foreground">
+                                                • {item.name}: SAR {item.value.toLocaleString()}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="flex flex-wrap gap-4 justify-center">
+                            {groupedData.slice(0, 8).map((item, index) => (
+                              <div key={item.name} className="flex items-center gap-2">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                />
+                                <span className="text-sm text-muted-foreground">
+                                  {item.name}: <span className="font-semibold text-foreground">SAR {formatCurrency(item.value)}</span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })() : (
+                      <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                        No asset data available
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+
+            {/* Employee and Department Insights */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Employee Insights */}
+              <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle>Top Employee Asset Assigned </CardTitle>
+                      <p className="text-sm text-muted-foreground">Performance across employees</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="value" className="w-full">
+                    <TabsList className="grid w-full max-w-md grid-cols-2 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm mb-6">
+                      <TabsTrigger value="value" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                        By Asset Value
+                      </TabsTrigger>
+                      <TabsTrigger value="items" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                        By No. of Items Assigned
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="value">
+                      {data.topEmployeesByValue.length > 0 ? (() => {
+                        const { groupedData } = groupSmallItems(data.topEmployeesByValue, 'value', 5);
+                        return (
+                          <ResponsiveContainer width="100%" height={400}>
+                            <BarChart
+                              data={groupedData}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis
+                                dataKey="name"
+                                angle={-45}
+                                textAnchor="end"
+                                height={100}
+                                tick={{ fontSize: 11 }}
+                              />
+                              <YAxis tickFormatter={formatCurrency} />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload[0]) return null;
+                                  const data = payload[0].payload;
+                                  const isOthers = (data as any)._isOthers;
+                                  const othersItems = (data as any)._othersItems || [];
+
+                                  return (
+                                    <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
+                                      <p className="font-semibold text-foreground mb-1">
+                                        {data.name}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Value: <span className="font-semibold text-foreground">SAR {data.value.toLocaleString()}</span>
+                                      </p>
+                                      {isOthers && othersItems.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
+                                          <div className="max-h-32 overflow-y-auto">
+                                            {othersItems.map((item: any, idx: number) => (
+                                              <p key={idx} className="text-xs text-muted-foreground">
+                                                • {item.name}: SAR {item.value.toLocaleString()}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              />
+                              <Bar
+                                dataKey="value"
+                                fill="#F97316"
+                                radius={[8, 8, 0, 0]}
+                                onClick={(data: any, index: number, e: any) => {
+                                  const payload = data.payload || data;
+                                  handleEmployeeClick(payload.name, payload.id);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        );
+                      })() : (
+                        <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                          No employee data available
+                        </div>
+                      )}
+                    </TabsContent>
+                    <TabsContent value="items">
+                      {data.topEmployeesByItems.length > 0 ? (() => {
+                        const { groupedData } = groupSmallItems(data.topEmployeesByItems, 'items', 5);
+                        return (
+                          <ResponsiveContainer width="100%" height={400}>
+                            <BarChart
+                              data={groupedData}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis
+                                dataKey="name"
+                                angle={-45}
+                                textAnchor="end"
+                                height={100}
+                                tick={{ fontSize: 11 }}
+                              />
+                              <YAxis />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload[0]) return null;
+                                  const data = payload[0].payload;
+                                  const isOthers = (data as any)._isOthers;
+                                  const othersItems = (data as any)._othersItems || [];
+
+                                  return (
+                                    <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
+                                      <p className="font-semibold text-foreground mb-1">
+                                        {data.name}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Items: <span className="font-semibold text-foreground">{data.items.toLocaleString()}</span>
+                                      </p>
+                                      {isOthers && othersItems.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
+                                          <div className="max-h-32 overflow-y-auto">
+                                            {othersItems.map((item: any, idx: number) => (
+                                              <p key={idx} className="text-xs text-muted-foreground">
+                                                • {item.name}: {item.items.toLocaleString()} items
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              />
+                              <Bar
+                                dataKey="items"
+                                fill="#F97316"
+                                radius={[8, 8, 0, 0]}
+                                onClick={(data: any, index: number, e: any) => {
+                                  const payload = data.payload || data;
+                                  handleEmployeeClick(payload.name, payload.id);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        );
+                      })() : (
+                        <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                          No employee data available
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+
+              {/* Department Insights */}
+              <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle>Top Department Asset Assigned</CardTitle>
+                      <p className="text-sm text-muted-foreground">Performance across departments</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="value" className="w-full">
+                    <TabsList className="grid w-full max-w-md grid-cols-2 bg-card/80 backdrop-blur-sm border-2 border-card-border shadow-sm mb-6">
+                      <TabsTrigger value="value" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                        By Value
+                      </TabsTrigger>
+                      <TabsTrigger value="employees" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                        By Employee Count
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="value">
+                      {data.departmentValue.length > 0 ? (() => {
+                        const { groupedData } = groupSmallItems(data.departmentValue, 'value', 5);
+                        return (
+                          <ResponsiveContainer width="100%" height={400}>
+                            <BarChart
+                              data={groupedData}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis
+                                dataKey="name"
+                                angle={-45}
+                                textAnchor="end"
+                                height={100}
+                                tick={{ fontSize: 11 }}
+                              />
+                              <YAxis tickFormatter={formatCurrency} />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload[0]) return null;
+                                  const data = payload[0].payload;
+                                  const isOthers = (data as any)._isOthers;
+                                  const othersItems = (data as any)._othersItems || [];
+
+                                  return (
+                                    <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
+                                      <p className="font-semibold text-foreground mb-1">
+                                        {data.name}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Value: <span className="font-semibold text-foreground">SAR {data.value.toLocaleString()}</span>
+                                      </p>
+                                      {isOthers && othersItems.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
+                                          <div className="max-h-32 overflow-y-auto">
+                                            {othersItems.map((item: any, idx: number) => (
+                                              <p key={idx} className="text-xs text-muted-foreground">
+                                                • {item.name}: SAR {item.value.toLocaleString()}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              />
+                              <Bar
+                                dataKey="value"
+                                fill="#F97316"
+                                radius={[8, 8, 0, 0]}
+                                onClick={(data: any, index: number, e: any) => {
+                                  const payload = data.payload || data;
+                                  handleDepartmentClick(payload.name, payload.id);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        );
+                      })() : (
+                        <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                          No department value data available
+                        </div>
+                      )}
+                    </TabsContent>
+                    <TabsContent value="employees">
+                      {data.departmentEmployeeCount.length > 0 ? (() => {
+                        const { groupedData } = groupSmallItems(data.departmentEmployeeCount, 'count', 5);
+                        return (
+                          <ResponsiveContainer width="100%" height={400}>
+                            <BarChart
+                              data={groupedData}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis
+                                dataKey="name"
+                                angle={-45}
+                                textAnchor="end"
+                                height={100}
+                                tick={{ fontSize: 11 }}
+                              />
+                              <YAxis />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || !payload[0]) return null;
+                                  const data = payload[0].payload;
+                                  const isOthers = (data as any)._isOthers;
+                                  const othersItems = (data as any)._othersItems || [];
+
+                                  return (
+                                    <div className="bg-card border-2 border-border rounded-lg p-3 shadow-lg">
+                                      <p className="font-semibold text-foreground mb-1">
+                                        {data.name}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Count: <span className="font-semibold text-foreground">{data.count}</span>
+                                      </p>
+                                      {isOthers && othersItems.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <p className="text-xs font-semibold text-muted-foreground mb-1">Includes:</p>
+                                          <div className="max-h-32 overflow-y-auto">
+                                            {othersItems.map((item: any, idx: number) => (
+                                              <p key={idx} className="text-xs text-muted-foreground">
+                                                • {item.name}: {item.count} employees
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              />
+                              <Bar
+                                dataKey="count"
+                                fill="#F97316"
+                                radius={[8, 8, 0, 0]}
+                                onClick={(data: any, index: number, e: any) => {
+                                  const payload = data.payload || data;
+                                  handleDepartmentClick(payload.name, payload.id);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        );
+                      })() : (
+                        <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                          No department employee data available
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>

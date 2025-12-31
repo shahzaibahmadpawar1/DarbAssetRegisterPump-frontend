@@ -18,7 +18,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { Printer, QrCode } from "lucide-react";
+import { Printer, QrCode, Search } from "lucide-react";
 import BackToDashboardButton from "@/components/BackToDashboardButton";
 
 type Category = {
@@ -83,13 +83,15 @@ export default function AssetsByCategoryReport() {
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Search query state (for general search bar)
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  
   // Determine active filter type for column visibility
+  // Since we're using general search, show both station and employee columns
   const activeFilterType = useMemo(() => {
-    if (selectedEmployee) return "employee";
-    if (selectedStation) return "station";
-    if (selectedSerial || barcodeFilter) return "serial_barcode";
-    return null;
-  }, [selectedEmployee, selectedStation, selectedSerial, barcodeFilter]);
+    if (searchQuery.trim() || barcodeFilter) return "serial_barcode";
+    return null; // Show all columns when viewing all
+  }, [searchQuery, barcodeFilter]);
 
   // Load categories
   useEffect(() => {
@@ -148,10 +150,27 @@ export default function AssetsByCategoryReport() {
       });
       const data = await res.json();
       const assetsData = Array.isArray(data) ? data : [];
+      
+      // Debug: Log to check if employee assignments are included
+      console.log("Loaded assets:", assetsData.length);
+      const withEmployeeAssignments = assetsData.filter((a: Asset) => a.employeeName);
+      console.log("Assets with employee assignments:", withEmployeeAssignments.length);
+      if (withEmployeeAssignments.length > 0) {
+        console.log("Sample employee assignment:", withEmployeeAssignments[0]);
+        console.log("Employee name in sample:", withEmployeeAssignments[0].employeeName);
+        console.log("Serial number in sample:", withEmployeeAssignments[0].serial_number);
+        console.log("Barcode in sample:", withEmployeeAssignments[0].barcode);
+      } else {
+        console.log("No employee assignments found in response");
+        // Check if any assets have employee_id set
+        const withEmployeeId = assetsData.filter((a: Asset) => a.employee_id);
+        console.log("Assets with employee_id:", withEmployeeId.length);
+      }
+      
       setAllAssets(assetsData);
       
       // Set assets to allAssets if no filters are active
-      if (!selectedEmployee && !selectedStation && !selectedSerial && !barcodeFilter) {
+      if (!barcodeFilter && !searchQuery.trim()) {
         setAssets(assetsData);
       }
       
@@ -197,7 +216,19 @@ export default function AssetsByCategoryReport() {
       // Transform the full asset data to match the flattened format expected by this page
       const flattenedAssets: Asset[] = [];
       
+      // Create a map of batch_id -> purchase_price from asset batches for quick lookup
+      const batchPriceMap = new Map<number, number>();
+      
       (Array.isArray(data) ? data : []).forEach((asset: any) => {
+        // Build batch price map for this asset
+        if (asset.batches && Array.isArray(asset.batches)) {
+          asset.batches.forEach((batch: any) => {
+            if (batch.id && batch.purchase_price) {
+              batchPriceMap.set(batch.id, Number(batch.purchase_price));
+            }
+          });
+        }
+        
         // Process station assignments
         if (asset.assignments && Array.isArray(asset.assignments)) {
           asset.assignments.forEach((assignment: any) => {
@@ -206,7 +237,8 @@ export default function AssetsByCategoryReport() {
                 // Check if this allocation has the matching barcode
                 if (alloc.barcode?.toLowerCase() === barcode.toLowerCase()) {
                   const batch = alloc.asset_purchase_batches;
-                  if (batch) {
+                  const purchasePrice = batch?.purchase_price || (alloc.batch_id ? batchPriceMap.get(alloc.batch_id) : undefined) || 0;
+                  if (batch || alloc.batch_id) {
                     flattenedAssets.push({
                       id: asset.id,
                       asset_name: asset.asset_name,
@@ -219,7 +251,7 @@ export default function AssetsByCategoryReport() {
                       serial_number: alloc.serial_number || null,
                       barcode: alloc.barcode || null,
                       assignmentQuantity: 1,
-                      assignmentValue: batch.purchase_price || 0,
+                      assignmentValue: purchasePrice,
                     });
                   }
                 }
@@ -227,9 +259,29 @@ export default function AssetsByCategoryReport() {
             }
           });
         }
-        
-        // Note: Employee assignments are not included in the backend search response
-        // They would need to be fetched separately if needed
+
+        // Process employee assignments (NEW - using employee_assignments from asset data)
+        if (asset.employee_assignments && Array.isArray(asset.employee_assignments)) {
+          asset.employee_assignments.forEach((empAssign: any) => {
+            if (empAssign.barcode?.toLowerCase() === barcode.toLowerCase()) {
+              const purchasePrice = (empAssign.batch_id ? batchPriceMap.get(empAssign.batch_id) : undefined) ?? 0;
+              flattenedAssets.push({
+                id: asset.id,
+                asset_name: asset.asset_name,
+                asset_number: asset.asset_number,
+                categoryName: asset.categoryName,
+                pumpName: undefined,
+                pump_id: undefined,
+                employeeName: empAssign.employee_name || null,
+                employee_id: empAssign.employee_id || null,
+                serial_number: empAssign.serial_number || null,
+                barcode: empAssign.barcode || null,
+                assignmentQuantity: 1,
+                assignmentValue: purchasePrice,
+              });
+            }
+          });
+        }
       });
       
       // Extract serial numbers from results
@@ -273,7 +325,19 @@ export default function AssetsByCategoryReport() {
       // Transform the full asset data to match the flattened format expected by this page
       const flattenedAssets: Asset[] = [];
       
+      // Create a map of batch_id -> purchase_price from asset batches for quick lookup
+      const batchPriceMap = new Map<number, number>();
+      
       (Array.isArray(data) ? data : []).forEach((asset: any) => {
+        // Build batch price map for this asset
+        if (asset.batches && Array.isArray(asset.batches)) {
+          asset.batches.forEach((batch: any) => {
+            if (batch.id && batch.purchase_price) {
+              batchPriceMap.set(batch.id, Number(batch.purchase_price));
+            }
+          });
+        }
+        
         // Process station assignments
         if (asset.assignments && Array.isArray(asset.assignments)) {
           asset.assignments.forEach((assignment: any) => {
@@ -282,7 +346,8 @@ export default function AssetsByCategoryReport() {
                 // Check if this allocation has the matching serial number
                 if (alloc.serial_number?.toLowerCase() === serial.toLowerCase()) {
                   const batch = alloc.asset_purchase_batches || alloc.batch;
-                  if (batch) {
+                  const purchasePrice = batch?.purchase_price || (alloc.batch_id ? batchPriceMap.get(alloc.batch_id) : undefined) || 0;
+                  if (batch || alloc.batch_id) {
                     flattenedAssets.push({
                       id: asset.id,
                       asset_name: asset.asset_name,
@@ -295,7 +360,7 @@ export default function AssetsByCategoryReport() {
                       serial_number: alloc.serial_number || null,
                       barcode: alloc.barcode || null,
                       assignmentQuantity: 1,
-                      assignmentValue: batch.purchase_price || 0,
+                      assignmentValue: purchasePrice,
                     });
                   }
                 }
@@ -303,67 +368,30 @@ export default function AssetsByCategoryReport() {
             }
           });
         }
-      });
-      
-      // Fetch employee assignments for this serial number
-      try {
-        const empRes = await fetch(
-          `${API_BASE}/api/employees`,
-          {
-            credentials: "include",
-            headers: {
-              ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
-            },
-          }
-        );
-        if (empRes.ok) {
-          const allEmployees = await empRes.json();
-          // Check each employee's assignments
-          for (const emp of (allEmployees || [])) {
-            try {
-              const empAssignRes = await fetch(
-                `${API_BASE}/api/employees/${emp.id}/assignments`,
-                {
-                  credentials: "include",
-                  headers: {
-                    ...(storedToken ? { "Authorization": `Bearer ${storedToken}` } : {}),
-                  },
-                }
-              );
-              if (empAssignRes.ok) {
-                const empAssignments = await empAssignRes.json();
-                (empAssignments || []).forEach((empAssign: any) => {
-                  if (empAssign.serial_number?.toLowerCase() === serial.toLowerCase()) {
-                    const batch = empAssign.batch;
-                    const assetFromBatch = batch?.asset;
-                    if (assetFromBatch && batch) {
-                      flattenedAssets.push({
-                        id: assetFromBatch.id,
-                        asset_name: assetFromBatch.asset_name || assetFromBatch.name || "Unknown Asset",
-                        asset_number: assetFromBatch.asset_number || "—",
-                        categoryName: assetFromBatch.categoryName || assetFromBatch.category?.name || null,
-                        pumpName: undefined,
-                        pump_id: undefined,
-                        employeeName: emp.name || null,
-                        employee_id: emp.id || null,
-                        serial_number: empAssign.serial_number || null,
-                        barcode: empAssign.barcode || null,
-                        assignmentQuantity: 1,
-                        assignmentValue: batch.purchase_price || 0,
-                      });
-                    }
-                  }
-                });
-              }
-            } catch (err) {
-              // Skip this employee if there's an error
-              continue;
+
+        // Process employee assignments (NEW - using employee_assignments from asset data)
+        if (asset.employee_assignments && Array.isArray(asset.employee_assignments)) {
+          asset.employee_assignments.forEach((empAssign: any) => {
+            if (empAssign.serial_number?.toLowerCase() === serial.toLowerCase()) {
+              const purchasePrice = (empAssign.batch_id ? batchPriceMap.get(empAssign.batch_id) : undefined) ?? 0;
+              flattenedAssets.push({
+                id: asset.id,
+                asset_name: asset.asset_name,
+                asset_number: asset.asset_number,
+                categoryName: asset.categoryName,
+                pumpName: undefined,
+                pump_id: undefined,
+                employeeName: empAssign.employee_name || null,
+                employee_id: empAssign.employee_id || null,
+                serial_number: empAssign.serial_number || null,
+                barcode: empAssign.barcode || null,
+                assignmentQuantity: 1,
+                assignmentValue: purchasePrice,
+              });
             }
-          }
+          });
         }
-      } catch (empErr) {
-        console.error("Error fetching employee assignments for serial:", empErr);
-      }
+      });
       
       // Extract serial numbers from results
       const serialNumbers = new Set<string>(allSerialNumbers);
@@ -383,43 +411,18 @@ export default function AssetsByCategoryReport() {
     }
   };
 
-  // Handle filter changes
+  // Handle barcode filter changes
   useEffect(() => {
-    // Clear other filters when one is selected
-    if (selectedEmployee) {
-      setSelectedStation("");
-      setSelectedSerial("");
-      setBarcodeFilter(null);
-      setStationSearch("");
-      setSerialSearch("");
-      fetchAssetsByEmployee(Number(selectedEmployee));
-    } else if (selectedStation) {
-      setSelectedEmployee("");
-      setSelectedSerial("");
-      setBarcodeFilter(null);
-      setEmployeeSearch("");
-      setSerialSearch("");
-      fetchAssetsByStation(Number(selectedStation));
-    } else if (selectedSerial) {
-      setSelectedEmployee("");
-      setSelectedStation("");
-      setBarcodeFilter(null);
-      setEmployeeSearch("");
-      setStationSearch("");
-      loadAssetsBySerial(selectedSerial);
-    } else if (barcodeFilter) {
-      setSelectedEmployee("");
-      setSelectedStation("");
-      setSelectedSerial("");
-      setEmployeeSearch("");
-      setStationSearch("");
-      setSerialSearch("");
+    if (barcodeFilter) {
+      setSearchQuery(""); // Clear general search when barcode is scanned
       loadAssetsByBarcode(barcodeFilter);
     } else {
-      // Explicitly reload all assets when all filters are cleared
-      loadAssets();
+      // Reload all assets when barcode filter is cleared
+      if (!searchQuery.trim()) {
+        loadAssets();
+      }
     }
-  }, [selectedEmployee, selectedStation, selectedSerial, barcodeFilter]);
+  }, [barcodeFilter]);
 
   // Fetch assets assigned to a specific employee
   const fetchAssetsByEmployee = async (employeeId: number) => {
@@ -533,18 +536,91 @@ export default function AssetsByCategoryReport() {
 
   // Update assets when allAssets changes (for default view)
   useEffect(() => {
-    if (!selectedEmployee && !selectedStation && !selectedSerial && !barcodeFilter) {
+    if (!barcodeFilter && !searchQuery.trim()) {
       setAssets(allAssets);
     }
-  }, [allAssets, selectedEmployee, selectedStation, selectedSerial, barcodeFilter]);
+  }, [allAssets, barcodeFilter, searchQuery]);
+
+  // Filter assets based on search query (employee name, station name, serial number, barcode)
+  // Always filter from allAssets to ensure we have all data including employee assignments
+  const filteredAssets = useMemo(() => {
+    let filtered = searchQuery.trim() ? allAssets : assets;
+    
+    // First, filter to only show items (rows with serial_number or barcode, OR employee assignments)
+    // This ensures we only show individual items from batches, not assets
+    // But we also include employee assignments even if they don't have serial/barcode yet
+    filtered = filtered.filter((asset) => {
+      // Show rows that represent individual items (have serial number or barcode)
+      // OR show employee assignments (they represent items assigned to employees)
+      return asset.serial_number || asset.barcode || asset.employeeName;
+    });
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      
+      // Create a regex for word-boundary matching (for names) or exact substring (for serial/barcode)
+      // For names: match whole words only (prevents "ali" matching "khalid")
+      // For serial/barcode: allow substring matching
+      const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const nameRegex = new RegExp(`\\b${escapedQuery}\\b`, 'i');
+      const substringRegex = new RegExp(escapedQuery, 'i');
+      
+      filtered = filtered.filter((asset) => {
+        // Check employee name - use word boundary matching to prevent substring matches
+        const employeeMatch = asset.employeeName 
+          ? nameRegex.test(asset.employeeName) 
+          : false;
+        
+        // Check station name - use word boundary matching
+        const stationMatch = asset.pumpName 
+          ? nameRegex.test(asset.pumpName) 
+          : false;
+        
+        // Check serial number - allow substring matching (user might search partial serial)
+        const serialMatch = asset.serial_number 
+          ? substringRegex.test(asset.serial_number.toLowerCase()) 
+          : false;
+        
+        // Check barcode - allow substring matching (user might search partial barcode)
+        const barcodeMatch = asset.barcode 
+          ? substringRegex.test(asset.barcode.toLowerCase()) 
+          : false;
+
+        // Items without serial/barcode MUST match employee name exactly (word boundary)
+        // They should NOT appear if they don't match - this prevents keyboard items from showing in unrelated searches
+        if (!asset.serial_number && !asset.barcode) {
+          // Only show if employee name matches (not station, since these are employee assignments)
+          return employeeMatch;
+        }
+        
+        // Items with serial/barcode can match any field
+        return employeeMatch || stationMatch || serialMatch || barcodeMatch;
+      });
+      
+      // Debug logging to help identify issues
+      console.log(`[DEBUG] Search query: "${searchQuery}", Filtered count: ${filtered.length}`);
+      if (filtered.length > 0) {
+        console.log(`[DEBUG] Sample filtered items:`, filtered.slice(0, 3).map((a: Asset) => ({
+          asset_name: a.asset_name,
+          employeeName: a.employeeName,
+          pumpName: a.pumpName,
+          serial_number: a.serial_number,
+          barcode: a.barcode,
+          hasSerialOrBarcode: !!(a.serial_number || a.barcode)
+        })));
+      }
+    }
+
+    return filtered;
+  }, [assets, allAssets, searchQuery]);
 
   // Calculate total value: sum of assignmentValue for each row
   const totalInventoryValue = useMemo(() => {
-    return assets.reduce((sum, asset) => sum + (asset.assignmentValue ?? 0), 0);
-  }, [assets]);
+    return filteredAssets.reduce((sum, asset) => sum + (asset.assignmentValue ?? 0), 0);
+  }, [filteredAssets]);
 
   const handlePrint = () => {
-    if (assets.length === 0) {
+    if (filteredAssets.length === 0) {
       alert("Nothing to print for the selected filters.");
       return;
     }
@@ -552,21 +628,16 @@ export default function AssetsByCategoryReport() {
     if (!printWindow) return;
 
     let filterText = "All Assets";
-    if (selectedEmployee) {
-      const emp = employees.find(e => e.id === Number(selectedEmployee));
-      filterText = `Employee: ${emp?.name || selectedEmployee}`;
-    } else if (selectedStation) {
-      const station = pumps.find(p => p.id === Number(selectedStation));
-      filterText = `Station: ${station?.name || selectedStation}`;
-    } else if (selectedSerial) {
-      filterText = `Serial Number: ${selectedSerial}`;
+    if (searchQuery.trim()) {
+      filterText = `Search: "${searchQuery}"`;
     } else if (barcodeFilter) {
       filterText = `Barcode: ${barcodeFilter}`;
     }
 
-    const showStation = activeFilterType === "station" || activeFilterType === "serial_barcode";
-    const showEmployee = activeFilterType === "employee" || activeFilterType === "serial_barcode";
-    const showCategory = activeFilterType !== "station";
+    // Always show all columns since we're using general search
+    const showStation = true;
+    const showEmployee = true;
+    const showCategory = true;
 
     const html = `
       <html>
@@ -601,7 +672,7 @@ export default function AssetsByCategoryReport() {
               </tr>
             </thead>
             <tbody>
-              ${assets
+              ${filteredAssets
                 .map(
                   (a) => `
                   <tr>
@@ -647,222 +718,105 @@ export default function AssetsByCategoryReport() {
         </div>
       </div>
         </div>
-        {/* Filters and Barcode Scanner */}
-        <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg p-6 relative z-10">
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              {/* Employee Filter - Searchable */}
-              <div className="relative z-20">
-                <Input
-                  type="text"
-                  placeholder="Search Employee..."
-                  value={employeeSearch}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    setEmployeeSearch(e.target.value);
-                    setShowEmployeeDropdown(true);
-                  }}
-                  onFocus={() => setShowEmployeeDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
-                  className="h-11 border-2 focus:border-primary"
-                />
-                {showEmployeeDropdown && (
-                  <div className="absolute z-[9999] w-full mt-1 bg-white border-2 border-primary/20 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    <div
-                      className="px-3 py-2 hover:bg-primary/10 cursor-pointer"
-                      onClick={() => {
-                        setSelectedEmployee("");
-                        setEmployeeSearch("");
-                        setShowEmployeeDropdown(false);
-                      }}
-                    >
-                      All Employees
-                    </div>
-                    {employees
-                      .filter((emp) =>
-                        !employeeSearch ||
-                        emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-                        emp.employee_id?.toLowerCase().includes(employeeSearch.toLowerCase())
-                      )
-                      .map((emp) => (
-                        <div
-                          key={emp.id}
-                          className="px-3 py-2 hover:bg-primary/10 cursor-pointer"
-                          onClick={() => {
-                            setSelectedEmployee(String(emp.id));
-                            setEmployeeSearch(`${emp.name}${emp.employee_id ? ` (${emp.employee_id})` : ""}`);
-                            setShowEmployeeDropdown(false);
-                          }}
-                        >
-                          {emp.name} {emp.employee_id ? `(${emp.employee_id})` : ""}
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Station Filter - Searchable */}
-              <div className="relative z-20">
-                <Input
-                  type="text"
-                  placeholder="Search Station..."
-                  value={stationSearch}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    setStationSearch(e.target.value);
-                    setShowStationDropdown(true);
-                  }}
-                  onFocus={() => setShowStationDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowStationDropdown(false), 200)}
-                  className="h-11 border-2 focus:border-primary"
-                />
-                {showStationDropdown && (
-                  <div className="absolute z-[9999] w-full mt-1 bg-white border-2 border-primary/20 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    <div
-                      className="px-3 py-2 hover:bg-primary/10 cursor-pointer"
-                      onClick={() => {
-                        setSelectedStation("");
-                        setStationSearch("");
-                        setShowStationDropdown(false);
-                      }}
-                    >
-                      All Stations
-                    </div>
-                    {pumps
-                      .filter((pump) =>
-                        !stationSearch ||
-                        pump.name.toLowerCase().includes(stationSearch.toLowerCase())
-                      )
-                      .map((pump) => (
-                        <div
-                          key={pump.id}
-                          className="px-3 py-2 hover:bg-primary/10 cursor-pointer"
-                          onClick={() => {
-                            setSelectedStation(String(pump.id));
-                            setStationSearch(pump.name);
-                            setShowStationDropdown(false);
-                          }}
-                        >
-                          {pump.name}
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Serial Number Filter - Searchable */}
-              <div className="relative z-20">
-                <Input
-                  type="text"
-                  placeholder="Search Serial Number..."
-                  value={serialSearch}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    setSerialSearch(e.target.value);
-                    setShowSerialDropdown(true);
-                  }}
-                  onFocus={() => setShowSerialDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowSerialDropdown(false), 200)}
-                  className="h-11 border-2 focus:border-primary"
-                />
-                {showSerialDropdown && (
-                  <div className="absolute z-[9999] w-full mt-1 bg-white border-2 border-primary/20 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    <div
-                      className="px-3 py-2 hover:bg-primary/10 cursor-pointer"
-                      onClick={() => {
-                        setSelectedSerial("");
-                        setSerialSearch("");
-                        setShowSerialDropdown(false);
-                      }}
-                    >
-                      All Serial Numbers
-                    </div>
-                    {allSerialNumbers
-                      .filter((serial) =>
-                        !serialSearch ||
-                        serial.toLowerCase().includes(serialSearch.toLowerCase())
-                      )
-                      .map((serial) => (
-                        <div
-                          key={serial}
-                          className="px-3 py-2 hover:bg-primary/10 cursor-pointer"
-                          onClick={() => {
-                            setSelectedSerial(serial);
-                            setSerialSearch(serial);
-                            setShowSerialDropdown(false);
-                          }}
-                        >
-                          {serial}
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Barcode Scanner */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsScanningMode(true);
-                  }}
-                  className={`flex-1 border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 h-11 ${isScanningMode ? "ring-2 ring-primary ring-offset-2" : ""}`}
-                >
-                  <QrCode className="w-4 h-4 mr-2" />
-                  {isScanningMode ? "Scanning..." : "Scan Barcode"}
-                </Button>
-        <Button 
-          variant="outline" 
-          onClick={handlePrint}
-                  className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium shrink-0 h-11"
-                >
-                  <Printer className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-            
-            {/* Active Filter Display */}
-            {(selectedEmployee || selectedStation || selectedSerial || barcodeFilter) && (
-              <div className="flex flex-wrap gap-2 items-center">
-                <span className="text-sm text-muted-foreground">Active filters:</span>
-                {selectedEmployee && (
-                  <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                    Employee: {employees.find(e => e.id === Number(selectedEmployee))?.name || selectedEmployee}
-                  </span>
-                )}
-                {selectedStation && (
-                  <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                    Station: {pumps.find(p => p.id === Number(selectedStation))?.name || selectedStation}
-                  </span>
-                )}
-                {selectedSerial && (
-                  <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                    Serial: {selectedSerial}
-                  </span>
-                )}
-                {barcodeFilter && (
-                  <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                    Barcode: {barcodeFilter}
-                  </span>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
+        {/* Search Bar */}
+        <Card className="border-2 border-card-border bg-card/80 backdrop-blur-sm shadow-lg p-4 relative z-10">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                type="text"
+                placeholder="Search by employee name, station name, serial number, or barcode..."
+                value={searchQuery}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setSearchQuery(e.target.value);
+                  // Clear specific filters when using general search
+                  if (e.target.value.trim()) {
                     setSelectedEmployee("");
                     setSelectedStation("");
                     setSelectedSerial("");
                     setBarcodeFilter(null);
-                    setIsScanningMode(false);
                     setEmployeeSearch("");
                     setStationSearch("");
                     setSerialSearch("");
-                  }}
-                  className="h-7 text-xs"
-                >
-                  Clear All
-                </Button>
-              </div>
+                  }
+                }}
+                className="pl-10 h-11 border-2 focus:border-primary transition-colors bg-card/80 backdrop-blur-sm"
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsScanningMode(true);
+              }}
+              className={`border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 shrink-0 h-11 ${isScanningMode ? "ring-2 ring-primary ring-offset-2" : ""}`}
+            >
+              <QrCode className="w-4 h-4 mr-2" />
+              {isScanningMode ? "Scanning..." : "Scan Barcode"}
+            </Button>
+            {isScanningMode && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsScanningMode(false);
+                  if (barcodeInputRef.current) {
+                    barcodeInputRef.current.value = "";
+                  }
+                  if (barcodeTimeoutRef.current) {
+                    clearTimeout(barcodeTimeoutRef.current);
+                  }
+                }}
+                className="bg-white/60 backdrop-blur-md hover:bg-white/80 shrink-0 h-11"
+              >
+                Cancel Scan
+              </Button>
             )}
+            {searchQuery && (
+              <Button
+                variant="outline"
+                onClick={() => setSearchQuery("")}
+                className="bg-white/60 backdrop-blur-md hover:bg-white/80 shrink-0 h-11"
+              >
+                Clear Search
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              onClick={handlePrint}
+              className="border-2 hover:border-primary/50 shadow-sm hover:shadow-md transition-all duration-300 font-medium shrink-0 h-11"
+            >
+              <Printer className="w-4 h-4" />
+            </Button>
           </div>
         </Card>
+        
+        {/* Active Filter Display */}
+        {(barcodeFilter || searchQuery.trim()) && (
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm text-muted-foreground">Active filters:</span>
+            {barcodeFilter && (
+              <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                Barcode: {barcodeFilter}
+              </span>
+            )}
+            {searchQuery.trim() && (
+              <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                Search: {searchQuery}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setBarcodeFilter(null);
+                setSearchQuery("");
+                setIsScanningMode(false);
+              }}
+              className="h-7 text-xs"
+            >
+              Clear All
+            </Button>
+          </div>
+        )}
 
         {isScanningMode && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -891,7 +845,7 @@ export default function AssetsByCategoryReport() {
         {barcodeSearchLoading && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>Searching...</strong> Please wait while we search for assets{barcodeFilter ? ` with barcode: ${barcodeFilter}` : selectedSerial ? ` with serial number: ${selectedSerial}` : ""}
+              <strong>Searching...</strong> Please wait while we search for assets{barcodeFilter ? ` with barcode: ${barcodeFilter}` : searchQuery ? ` with search: ${searchQuery}` : ""}
             </p>
           </div>
         )}
@@ -933,6 +887,7 @@ export default function AssetsByCategoryReport() {
               const scannedBarcode = value.trim();
               if (scannedBarcode.length > 0 && isScanningMode) {
                 setBarcodeFilter(scannedBarcode);
+                setSearchQuery(""); // Clear general search when barcode is scanned
                 setIsScanningMode(false);
                 if (barcodeInputRef.current) {
                   barcodeInputRef.current.value = "";
@@ -950,6 +905,7 @@ export default function AssetsByCategoryReport() {
                   clearTimeout(barcodeTimeoutRef.current);
                 }
                 setBarcodeFilter(scannedBarcode);
+                setSearchQuery(""); // Clear general search when barcode is scanned
                 setIsScanningMode(false);
                 barcodeInputRef.current.value = "";
               }
@@ -965,10 +921,9 @@ export default function AssetsByCategoryReport() {
           <TableRow>
             <TableHead>Asset Name</TableHead>
             <TableHead>Asset #</TableHead>
-            {activeFilterType !== "station" && <TableHead>Category</TableHead>}
-            {(activeFilterType === "station" || activeFilterType === "serial_barcode") && <TableHead>Station</TableHead>}
-            {(activeFilterType === "employee" || activeFilterType === "serial_barcode") && <TableHead>Employee</TableHead>}
-            {activeFilterType === null && <TableHead>Station</TableHead>}
+            <TableHead>Category</TableHead>
+            <TableHead>Station</TableHead>
+            <TableHead>Employee</TableHead>
             <TableHead>Serial #</TableHead>
             <TableHead>Barcode</TableHead>
             <TableHead>Assigned Qty</TableHead>
@@ -977,18 +932,17 @@ export default function AssetsByCategoryReport() {
           </TableHeader>
 
           <TableBody>
-            {assets.length > 0 ? (
-              assets.map((a) => (
+            {filteredAssets.length > 0 ? (
+              filteredAssets.map((a) => (
                 <TableRow
                   key={`${a.id}-${a.pump_id || a.employee_id || "unassigned"}-${a.serial_number || a.barcode || ""}`}
                   className="hover:bg-white/80 transition"
                 >
                   <TableCell>{a.asset_name}</TableCell>
                   <TableCell>{a.asset_number}</TableCell>
-                  {activeFilterType !== "station" && <TableCell>{a.categoryName ?? "-"}</TableCell>}
-                  {(activeFilterType === "station" || activeFilterType === "serial_barcode") && <TableCell>{a.pumpName ?? "-"}</TableCell>}
-                  {(activeFilterType === "employee" || activeFilterType === "serial_barcode") && <TableCell>{a.employeeName ?? "-"}</TableCell>}
-                  {activeFilterType === null && <TableCell>{a.pumpName ?? "-"}</TableCell>}
+                  <TableCell>{a.categoryName ?? "-"}</TableCell>
+                  <TableCell>{a.pumpName ?? "-"}</TableCell>
+                  <TableCell>{a.employeeName ?? "-"}</TableCell>
                   <TableCell>{a.serial_number ?? "-"}</TableCell>
                   <TableCell>{a.barcode ?? "-"}</TableCell>
                   <TableCell>{a.assignmentQuantity ?? 0}</TableCell>
